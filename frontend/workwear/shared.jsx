@@ -80,7 +80,8 @@ async function wwApi(path, init = {}) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body?.error?.message || `API 오류 (${res.status})`);
   }
-  return res.json().catch(() => ({}));
+  const body = await res.json().catch(() => ({}));
+  return Object.prototype.hasOwnProperty.call(body, 'data') ? body.data : body;
 }
 
 const WW = {
