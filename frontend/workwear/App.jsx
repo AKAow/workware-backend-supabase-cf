@@ -25,26 +25,37 @@ function App() {
   const [password, setPassword] = useApp('');
   const [error, setError] = useApp('');
 
+  async function resolveRole() {
+    const user = await WW.client.auth.getUser().then(({ data }) => data?.user).catch(() => null);
+    if (!user) return 'employee';
+    const metaRole = user.user_metadata?.role || user.app_metadata?.role;
+    if (metaRole === 'admin') return 'admin';
+    const isAdmin = await WW.listAdminOrders().then(() => true).catch(() => false);
+    return isAdmin ? 'admin' : 'employee';
+  }
+
   React.useEffect(() => {
     if (!WW?.client) return;
     WW.client.auth.getUser().then(async ({ data }) => {
       if (!data.user) return;
       await WW.bootstrap();
-      setRole('employee');
-      setScreen('home');
+      const detectedRole = await resolveRole();
+      setRole(detectedRole);
+      setScreen(detectedRole === 'admin' ? 'admin-dashboard' : 'home');
     });
   }, []);
 
   const totalQty = cart.reduce((s, i) => s + (i.qty || 1), 0);
   const page = PAGE_TITLES[screen] || { title: screen, sub: '' };
 
-  async function doLogin(loginRole) {
+  async function doLogin() {
     try {
       setError('');
       await WW.signIn(email, password);
       await WW.bootstrap();
-      setRole(loginRole);
-      setScreen(loginRole === 'admin' ? 'admin-dashboard' : 'home');
+      const detectedRole = await resolveRole();
+      setRole(detectedRole);
+      setScreen(detectedRole === 'admin' ? 'admin-dashboard' : 'home');
     } catch (e) {
       setError(e.message || '로그인 실패');
     }
@@ -86,8 +97,7 @@ function App() {
           <input className="form-input" type="password" placeholder="비밀번호" value={password} onChange={e => setPassword(e.target.value)} style={{ marginBottom: 8 }} />
           {error && <div style={{ color: 'var(--err)', fontSize: 12, marginBottom: 8 }}>{error}</div>}
           <div style={{ display: 'grid', gap: 8 }}>
-            <button className="btn btn-primary" onClick={() => doLogin('employee')}>직원 로그인</button>
-            <button className="btn btn-secondary" onClick={() => doLogin('admin')}>관리자 로그인</button>
+            <button className="btn btn-primary" onClick={doLogin}>로그인</button>
           </div>
         </div>
       </div>

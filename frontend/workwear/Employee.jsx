@@ -307,7 +307,7 @@ function EmployeeCatalog({ setScreen, setSelectedProduct }) {
 
       {/* 그리드 */}
       <div style={{flex:1, overflowY:'auto', padding:'16px 24px 32px'}}>
-        <div style={{display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:16}}>
+        <div className="product-grid">
           {filtered.map(p => {
             const totalStock = Object.values(p.stock).reduce((a,b)=>a+b,0);
             const isHovered = hoverId === p.id;
@@ -315,28 +315,18 @@ function EmployeeCatalog({ setScreen, setSelectedProduct }) {
             const badgeText = p.tag==='인기' ? '인기' : (totalStock<=5&&totalStock>0) ? '재고 부족' : totalStock===0 ? '품절' : null;
             return (
               <div key={p.id}
+                className="product-card"
                 onMouseEnter={()=>setHoverId(p.id)}
                 onMouseLeave={()=>setHoverId(null)}
                 onClick={()=>{setSelectedProduct(p); setScreen('detail');}}
                 style={{
-                  background:'#fff',
-                  borderRadius:4,
-                  cursor:'pointer',
-                  overflow:'hidden',
                   transform: isHovered ? 'scale(1.03)' : 'scale(1)',
-                  transition:'transform 200ms ease, box-shadow 200ms ease',
-                  boxShadow: isHovered ? '0 8px 28px rgba(0,0,0,0.12)' : '0 1px 4px rgba(0,0,0,0.06)',
+                  boxShadow: isHovered ? 'var(--shadow-lg)' : 'var(--shadow-sm)',
                   position:'relative',
                 }}
               >
                 {/* 이미지 영역 (카드 2/3) */}
-                <div style={{
-                  height:220,
-                  background:'linear-gradient(145deg,#f7f7f7 0%,#eeeeee 100%)',
-                  display:'flex', alignItems:'center', justifyContent:'center',
-                  fontSize:80, position:'relative',
-                  padding:20,
-                }}>
+                <div className="product-thumb" style={{ height:220, fontSize:80, padding:20 }}>
                   {badgeText && (
                     <span style={{
                       position:'absolute', top:10, left:10,
@@ -374,21 +364,12 @@ function EmployeeCatalog({ setScreen, setSelectedProduct }) {
                 )}
 
                 {/* 상품 정보 */}
-                <div style={{padding:'10px 14px 14px'}}>
-                  <div style={{
-                    fontSize:11, color:'#757575', marginBottom:4,
-                    fontFamily:"'Pretendard Variable', Pretendard, sans-serif",
-                    fontWeight:500,
-                  }}>{p.cat}</div>
-                  <div style={{
-                    fontSize:14, fontWeight:700, color:'#111', lineHeight:1.35,
-                    fontFamily:"var(--font-sans)",
-                    marginBottom:8,
-                  }}>{p.name}</div>
-                  <div style={{
-                    fontSize:16, fontWeight:800, color:'#111',
-                    fontFamily:"'Pretendard Variable', Pretendard, sans-serif",
-                  }}>{fmtPts(p.pts)}<span style={{fontSize:12, fontWeight:500, marginLeft:2}}>P</span></div>
+                <div className="product-info">
+                  <div className="product-cat">{p.cat}</div>
+                  <div className="product-name" style={{ marginBottom:8, lineHeight:1.35 }}>{p.name}</div>
+                  <div className="product-pts" style={{ fontSize:16, color:'#111' }}>
+                    {fmtPts(p.pts)}<span style={{fontSize:12, fontWeight:500, marginLeft:2}}>P</span>
+                  </div>
                 </div>
               </div>
             );
