@@ -329,7 +329,7 @@ function EmployeeCatalog({ setScreen, setSelectedProduct }) {
                 }}
               >
                 {/* 이미지 영역 (카드 2/3) */}
-                <div className="product-thumb" style={{ height:220, fontSize:80, padding:20, background:'linear-gradient(135deg,#eaf4ff 0%,#d4e8fb 100%)' }}>
+                <div className="product-thumb" style={{ aspectRatio:'1 / 1', height:'auto', fontSize:'clamp(56px, 9vw, 80px)', background:'linear-gradient(135deg,#eaf4ff 0%,#d4e8fb 100%)' }}>
                   {badgeText && (
                     <span style={{
                       position:'absolute', top:10, left:10,
