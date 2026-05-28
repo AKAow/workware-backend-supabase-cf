@@ -17,6 +17,7 @@ const PAGE_TITLES = {
 
 function App() {
   const [role, setRole] = useApp(null);
+  const [canAdmin, setCanAdmin] = useApp(false);
   const [screen, setScreen] = useApp('home');
   const [cart, setCart] = useApp([]);
   const [selectedProduct, setSelectedProduct] = useApp(null);
@@ -25,13 +26,13 @@ function App() {
   const [password, setPassword] = useApp('');
   const [error, setError] = useApp('');
 
-  async function resolveRole() {
+  async function resolveAccess() {
     const user = await WW.client.auth.getUser().then(({ data }) => data?.user).catch(() => null);
-    if (!user) return 'employee';
+    if (!user) return { role: 'employee', canAdmin: false };
     const metaRole = user.user_metadata?.role || user.app_metadata?.role;
-    if (metaRole === 'admin') return 'admin';
+    if (metaRole === 'admin') return { role: 'admin', canAdmin: true };
     const isAdmin = await WW.listAdminOrders().then(() => true).catch(() => false);
-    return isAdmin ? 'admin' : 'employee';
+    return { role: isAdmin ? 'admin' : 'employee', canAdmin: isAdmin };
   }
 
   React.useEffect(() => {
@@ -39,9 +40,10 @@ function App() {
     WW.client.auth.getUser().then(async ({ data }) => {
       if (!data.user) return;
       await WW.bootstrap();
-      const detectedRole = await resolveRole();
-      setRole(detectedRole);
-      setScreen(detectedRole === 'admin' ? 'admin-dashboard' : 'home');
+      const access = await resolveAccess();
+      setCanAdmin(access.canAdmin);
+      setRole(access.role);
+      setScreen(access.role === 'admin' ? 'admin-dashboard' : 'home');
     });
   }, []);
 
@@ -53,9 +55,10 @@ function App() {
       setError('');
       await WW.signIn(email, password);
       await WW.bootstrap();
-      const detectedRole = await resolveRole();
-      setRole(detectedRole);
-      setScreen(detectedRole === 'admin' ? 'admin-dashboard' : 'home');
+      const access = await resolveAccess();
+      setCanAdmin(access.canAdmin);
+      setRole(access.role);
+      setScreen(access.role === 'admin' ? 'admin-dashboard' : 'home');
     } catch (e) {
       setError(e.message || '로그인 실패');
     }
@@ -64,6 +67,7 @@ function App() {
   async function doLogout() {
     await WW.signOut();
     setRole(null);
+    setCanAdmin(false);
     setScreen('home');
     setCart([]);
     setCartOpen(false);
@@ -106,7 +110,7 @@ function App() {
 
   return (
     <div className="app-shell">
-      <Sidebar role={role} setRole={setRole} screen={screen} setScreen={setScreen} openCart={() => setCartOpen(true)} cartQty={totalQty} onLogout={doLogout} />
+      <Sidebar role={role} canAdmin={canAdmin} setRole={setRole} screen={screen} setScreen={setScreen} openCart={() => setCartOpen(true)} cartQty={totalQty} onLogout={doLogout} />
       <div className="main">
         <div className="topbar">
           <div><h2>{page.title}</h2><div className="sub">{page.sub}</div></div>
