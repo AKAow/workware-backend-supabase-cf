@@ -53,12 +53,12 @@ function EmployeeHome({ setScreen, setSelectedProduct, setCart }) {
         next[idx] = { ...next[idx], qty: (next[idx].qty || 1) + 1 };
         return next;
       }
-      return [...prev, { ...product, size: firstSize, qty: 1 }];
+      return [...prev, { ...product, size: firstSize, variant_id: product.variantBySize?.[firstSize] || null, qty: 1 }];
     });
   }
 
-  const featured = PRODUCTS.slice(0, 8);
-  const recentOrders = ORDERS.slice(0, 2);
+  const featured = store.products.slice(0, 8);
+  const recentOrders = store.orders.slice(0, 2);
 
   const card = {
     background: 'rgba(255,255,255,0.75)',
@@ -244,12 +244,13 @@ function EmployeeHome({ setScreen, setSelectedProduct, setCart }) {
 }
 /* ---- 카탈로그 화면 (나이키 스타일) ---- */
 function EmployeeCatalog({ setScreen, setSelectedProduct }) {
+  const store = useStore();
   const [search, setSearch] = useEmp('');
   const [cat, setCat] = useEmp('전체');
   const [hoverId, setHoverId] = useEmp(null);
   const cats = ['전체', '상의', '하의', '신발', '보호구', '장갑', '안전', '동계용', '우천용'];
 
-  const filtered = PRODUCTS.filter(p =>
+  const filtered = store.products.filter(p =>
     (cat === '전체' || p.cat === cat) &&
     (search === '' || p.name.includes(search))
   );
@@ -426,7 +427,7 @@ function ProductDetail({ product, setScreen, cart, setCart, openCart }) {
         next[idx] = { ...next[idx], qty: (next[idx].qty || 1) + 1 };
         return next;
       }
-      return [...prev, { ...product, size, qty: 1 }];
+      return [...prev, { ...product, size, variant_id: product.variantBySize?.[size] || null, qty: 1 }];
     });
     setAdded(true);
     setTimeout(()=>setAdded(false), 1800);
@@ -672,10 +673,11 @@ function EmployeeCart({ cart, setCart, setScreen }) {
 
 /* ---- 주문 내역 화면 ---- */
 function EmployeeOrders() {
+  const store = useStore();
   const [filter, setFilter] = useEmp('전체');
   const statusFilters = ['전체','pending','approved','shipped','delivered','rejected'];
   const labelMap = { 전체:'전체', pending:'대기', approved:'승인', shipped:'배송중', delivered:'완료', rejected:'반려' };
-  const filtered = filter==='전체' ? ORDERS : ORDERS.filter(o=>o.status===filter);
+  const filtered = filter==='전체' ? store.orders : store.orders.filter(o=>o.status===filter);
 
   return (
     <div className="content">
@@ -727,8 +729,18 @@ function CartDrawer({ isOpen, onClose, cart, setCart }) {
   }
 
   function submitOrder() {
-    setSubmitted(true);
-    setTimeout(() => { setCart([]); setSubmitted(false); onClose(); }, 1600);
+    (async () => {
+      try {
+        const items = cart.filter(i => i.variant_id).map(i => ({ variant_id: i.variant_id, quantity: i.qty || 1 }));
+        if (!items.length) throw new Error('상품 variant_id 매핑 후 주문 가능합니다.');
+        await WW.createOrder({ items });
+        await WW.bootstrap();
+        setSubmitted(true);
+        setTimeout(() => { setCart([]); setSubmitted(false); onClose(); }, 1600);
+      } catch (e) {
+        alert(e.message || '주문 실패');
+      }
+    })();
   }
 
   const total = cart.reduce((s, i) => s + i.pts * (i.qty || 1), 0);

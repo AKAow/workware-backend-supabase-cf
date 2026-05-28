@@ -62,6 +62,81 @@ function useStore() {
   return window._store;
 }
 
+const WW_CONFIG = window.WORKWEAR_CONFIG || {};
+const WW_SUPABASE = (window.supabase && WW_CONFIG.SUPABASE_URL && WW_CONFIG.SUPABASE_ANON_KEY)
+  ? window.supabase.createClient(WW_CONFIG.SUPABASE_URL, WW_CONFIG.SUPABASE_ANON_KEY)
+  : null;
+
+async function wwApi(path, init = {}) {
+  if (!WW_SUPABASE) throw new Error('Supabase 설정이 필요합니다.');
+  const { data } = await WW_SUPABASE.auth.getSession();
+  const token = data.session?.access_token;
+  if (!token) throw new Error('로그인이 필요합니다.');
+  const res = await fetch(`${WW_CONFIG.API_BASE}${path}`, {
+    ...init,
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...(init.headers || {}) },
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body?.error?.message || `API 오류 (${res.status})`);
+  }
+  return res.json().catch(() => ({}));
+}
+
+const WW = {
+  client: WW_SUPABASE,
+  async signIn(email, password) {
+    const { error } = await WW_SUPABASE.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+  },
+  async signOut() { if (WW_SUPABASE) await WW_SUPABASE.auth.signOut(); },
+  listProducts: () => wwApi('/products'),
+  listMyOrders: () => wwApi('/orders'),
+  listAdminOrders: () => wwApi('/admin/orders'),
+  listUsers: () => wwApi('/admin/users'),
+  myPoints: () => wwApi('/points/my'),
+  createOrder: (payload) => wwApi('/orders', { method: 'POST', body: JSON.stringify(payload) }),
+  approveOrder: (id) => wwApi(`/orders/${id}/approve`, { method: 'POST' }),
+  rejectOrder: (id, reason) => wwApi(`/orders/${id}/reject`, { method: 'POST', body: JSON.stringify({ reason }) }),
+  grantPoints: (user_id, amount, note) => wwApi('/points/grant', { method: 'POST', body: JSON.stringify({ user_id, amount, note }) }),
+  async bootstrap() {
+    if (!WW_SUPABASE) return;
+    const { data } = await WW_SUPABASE.auth.getUser();
+    const user = data.user;
+    if (!user) return;
+    const [products, myOrders, myPoints, users, adminOrders] = await Promise.all([
+      WW.listProducts().catch(() => []),
+      WW.listMyOrders().catch(() => []),
+      WW.myPoints().catch(() => ({ balance: EMPLOYEE.points })),
+      WW.listUsers().catch(() => []),
+      WW.listAdminOrders().catch(() => []),
+    ]);
+    const detailedProducts = await Promise.all((products || []).map(async (p) => {
+      const detail = await wwApi(`/products/${p.id}`).catch(() => null);
+      const variants = detail?.variants || [];
+      const sizes = variants.length ? variants.map((v) => String(v.size)) : ['FREE'];
+      const stock = variants.length
+        ? variants.reduce((acc, v) => ({ ...acc, [String(v.size)]: Number(v.stock_qty || 0) }), {})
+        : { FREE: 0 };
+      const variantBySize = variants.reduce((acc, v) => ({ ...acc, [String(v.size)]: v.id }), {});
+      return {
+        id: p.id, name: p.name, cat: p.category || '기타', pts: Number(p.point_price || 0),
+        thumb: '📦', sizes, stock, variantBySize, tag: '', active: !!p.is_active, featured: false, desc: p.description || '',
+      };
+    }));
+    window._store.products = detailedProducts;
+    window._store.orders = ((adminOrders && adminOrders.length ? adminOrders : myOrders) || []).map((o) => ({
+      id: o.id, emp: o.profiles?.full_name || o.profiles?.email || '-', dept: '-', items: `주문 #${String(o.id).slice(0, 8)}`,
+      pts: Number(o.total_points || 0), status: o.status, date: String(o.created_at || '').slice(0, 10),
+    }));
+    window._store.employees = (users || []).map((u) => ({
+      id: u.id, name: u.full_name || u.email, dept: '-', position: u.role, pts: Number(u.point_balance || 0), total_used: 0, joinDate: String(u.created_at || '').slice(0, 10),
+    }));
+    EMPLOYEE.points = Number(myPoints?.balance || EMPLOYEE.points);
+    window._store.pub();
+  },
+};
+
 
 const ICON_PATHS = {
   home:      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>,
@@ -205,4 +280,4 @@ function Sidebar({ role, setRole, screen, setScreen, openCart, cartQty, onLogout
   );
 }
 
-Object.assign(window, { Icon, StatusChip, fmtPts, Sidebar, useStore, PRODUCTS, ORDERS, EMPLOYEES, EMPLOYEE });
+Object.assign(window, { Icon, StatusChip, fmtPts, Sidebar, useStore, PRODUCTS, ORDERS, EMPLOYEES, EMPLOYEE, WW, WW_CONFIG });

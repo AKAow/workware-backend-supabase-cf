@@ -84,8 +84,8 @@ function AdminOrders() {
   const store = useStore();
   const [filter, setFilter] = useAdmin('pending');
 
-  function approve(id) { store.orders = store.orders.map(o=>o.id===id?{...o,status:'approved'}:o); store.pub(); }
-  function reject(id)  { store.orders = store.orders.map(o=>o.id===id?{...o,status:'rejected'}:o); store.pub(); }
+  async function approve(id) { await WW.approveOrder(id); await WW.bootstrap(); }
+  async function reject(id)  { await WW.rejectOrder(id, 'admin rejected'); await WW.bootstrap(); }
 
   const filtered = filter==='전체' ? store.orders : store.orders.filter(o=>o.status===filter);
   const pending = store.orders.filter(o=>o.status==='pending').length;
@@ -150,11 +150,10 @@ function AdminPoints() {
 
   const employees = store.employees;
 
-  function givePoints() {
+  async function givePoints() {
     if (!sel || !amount) return;
-    const amt = parseInt(amount);
-    store.employees = store.employees.map(e=>e.id===sel ? {...e, pts: e.pts + amt} : e);
-    store.pub();
+    await WW.grantPoints(sel, parseInt(amount, 10), note || null);
+    await WW.bootstrap();
     setDone(true);
     setTimeout(()=>{setDone(false);setSel(null);setAmount('');setNote('');},1800);
   }
