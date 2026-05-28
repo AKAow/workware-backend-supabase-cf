@@ -247,7 +247,6 @@ function EmployeeCatalog({ setScreen, setSelectedProduct }) {
   const store = useStore();
   const [search, setSearch] = useEmp('');
   const [cat, setCat] = useEmp('전체');
-  const [hoverId, setHoverId] = useEmp(null);
   const cats = ['전체', '상의', '하의', '신발', '보호구', '장갑', '안전', '동계용', '우천용'];
 
   const filtered = store.products.filter(p =>
@@ -256,127 +255,33 @@ function EmployeeCatalog({ setScreen, setSelectedProduct }) {
   );
 
   return (
-    <div style={{display:'flex', flexDirection:'column', height:'100%', overflow:'hidden', background:'linear-gradient(180deg,#ecf4ff 0%, #e6f0fc 100%)'}}>
-      {/* 필터바 + 검색 */}
-      <div style={{
-        padding:'0 24px',
-        borderBottom:'1px solid rgba(10,37,64,0.08)',
-        background:'rgba(255,255,255,0.8)',
-        backdropFilter:'blur(12px)',
-        display:'flex', alignItems:'center', justifyContent:'space-between',
-        flexShrink:0
-      }}>
-        <div style={{display:'flex', gap:0}}>
+    <div className="nike-catalog">
+      <div className="nike-catalog-head">
+        <div className="nike-cats">
           {cats.map(c => (
-            <button key={c} onClick={()=>setCat(c)} style={{
-              background:'none', border:'none', cursor:'pointer',
-              padding:'16px 16px 14px',
-              fontSize:13, fontWeight:600,
-              fontFamily:"var(--font-sans)",
-              color: cat===c ? '#111' : '#757575',
-              borderBottom: cat===c ? '2px solid #111' : '2px solid transparent',
-              transition:'color 120ms',
-              letterSpacing:'-0.01em',
-            }}>{c}</button>
+            <button key={c} onClick={()=>setCat(c)} className={cat===c ? 'active' : ''}>{c}</button>
           ))}
         </div>
-        {/* 검색 */}
-        <div style={{position:'relative', width:220}}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="#757575" strokeWidth="1.75" strokeLinecap="round" style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',width:15,height:15}}>
-            <circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>
-          </svg>
-          <input
-            style={{
-              width:'100%', boxSizing:'border-box',
-              background:'#f5f5f5', border:'none', borderRadius:20,
-              padding:'8px 14px 8px 32px',
-              fontSize:13, color:'#111', outline:'none',
-              fontFamily:"'Pretendard Variable', Pretendard, -apple-system, sans-serif",
-            }}
-            placeholder="상품 검색"
-            value={search}
-            onChange={e=>setSearch(e.target.value)}
-          />
+        <div className="nike-search">
+          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input placeholder="상품 검색" value={search} onChange={e=>setSearch(e.target.value)} />
         </div>
       </div>
 
-      {/* 결과 수 */}
-      <div style={{padding:'12px 24px 0', fontSize:12, color:'var(--fg-3)', fontFamily:"var(--font-sans)", flexShrink:0, fontWeight:500}}>
-        {filtered.length}개 상품
-      </div>
+      <div className="nike-count">{filtered.length}개 상품</div>
 
-      {/* 그리드 */}
-      <div style={{flex:1, overflowY:'auto', padding:'16px 24px 32px'}}>
-        <div className="catalog-grid">
-          {filtered.map(p => {
-            const totalStock = Object.values(p.stock).reduce((a,b)=>a+b,0);
-            const isHovered = hoverId === p.id;
-            const quickSizes = p.sizes.filter(s=>p.stock[s]>0).slice(0,4);
-            const badgeText = p.tag==='인기' ? '인기' : (totalStock<=5&&totalStock>0) ? '재고 부족' : totalStock===0 ? '품절' : null;
-            return (
-              <div key={p.id}
-                className="product-card"
-                onMouseEnter={()=>setHoverId(p.id)}
-                onMouseLeave={()=>setHoverId(null)}
-                onClick={()=>{setSelectedProduct(p); setScreen('detail');}}
-                style={{
-                  transform: isHovered ? 'scale(1.03)' : 'scale(1)',
-                  boxShadow: isHovered ? '0 20px 44px rgba(10,37,64,0.20)' : '0 10px 24px rgba(10,37,64,0.10)',
-                  border:'1px solid rgba(10,37,64,0.10)',
-                  borderRadius:18,
-                  background:'rgba(255,255,255,0.88)',
-                  position:'relative',
-                }}
-              >
-                {/* 이미지 영역 (카드 2/3) */}
-                <div className="product-thumb" style={{ aspectRatio:'1 / 1', height:'auto', fontSize:'clamp(56px, 9vw, 80px)', background:'linear-gradient(135deg,#eaf4ff 0%,#d4e8fb 100%)' }}>
-                  {badgeText && (
-                    <span style={{
-                      position:'absolute', top:10, left:10,
-                      fontSize:10, fontWeight:600,
-                      color: badgeText==='인기' ? 'var(--accent-600)' : badgeText==='품절' ? 'var(--fg-3)' : 'var(--warn)',
-                      background: badgeText==='인기' ? 'var(--accent-050)' : badgeText==='품절' ? 'rgba(155,174,200,0.15)' : 'var(--warn-050)',
-                      border: badgeText==='인기' ? '1px solid var(--accent-200)' : badgeText==='품절' ? '1px solid var(--border-hairline)' : '1px solid #F5D9A0',
-                      borderRadius:9999,
-                      padding:'2px 8px',
-                      fontFamily:"'Pretendard Variable', Pretendard, sans-serif",
-                      letterSpacing:'0.01em',
-                    }}>{badgeText}</span>
-                  )}
-                  <span style={{filter:'drop-shadow(0 4px 12px rgba(0,0,0,0.1))'}}>{p.thumb}</span>
-                </div>
-
-                {/* 호버 시 사이즈 바 */}
-                {isHovered && quickSizes.length > 0 && (
-                  <div style={{
-                    position:'absolute', bottom:96, left:0, right:0,
-                    background:'rgba(255,255,255,0.96)',
-                    padding:'10px 14px 8px',
-                    display:'flex', gap:6, flexWrap:'wrap',
-                    borderTop:'1px solid #f0f0f0',
-                  }}>
-                    {quickSizes.map(s=>(
-                      <span key={s} style={{
-                        padding:'4px 10px', border:'1px solid #ddd', borderRadius:2,
-                        fontSize:11, fontWeight:500, color:'#111',
-                        fontFamily:"'Pretendard Variable', Pretendard, sans-serif",
-                        background:'#fff',
-                      }}>{s}</span>
-                    ))}
-                  </div>
-                )}
-
-                {/* 상품 정보 */}
-                <div className="product-info" style={{background:'rgba(255,255,255,0.92)'}}>
-                  <div className="product-cat">{p.cat}</div>
-                  <div className="product-name" style={{ marginBottom:8, lineHeight:1.35 }}>{p.name}</div>
-                  <div className="product-pts" style={{ fontSize:16, color:'var(--accent-600)' }}>
-                    {fmtPts(p.pts)}<span style={{fontSize:12, fontWeight:500, marginLeft:2}}>P</span>
-                  </div>
-                </div>
+      <div className="nike-catalog-body">
+        <div className="nike-grid">
+          {filtered.map(p => (
+            <div key={p.id} className="nike-card" onClick={()=>{setSelectedProduct(p); setScreen('detail');}}>
+              <div className="nike-thumb">{p.thumb}</div>
+              <div className="nike-meta">
+                <div className="nike-cat">{p.cat}</div>
+                <div className="nike-name">{p.name}</div>
+                <div className="nike-price">{fmtPts(p.pts)} P</div>
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
       </div>
     </div>
