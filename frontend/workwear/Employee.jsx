@@ -307,7 +307,7 @@ function EmployeeCatalog({ setScreen, setSelectedProduct }) {
 
       {/* 그리드 */}
       <div style={{flex:1, overflowY:'auto', padding:'16px 24px 32px'}}>
-        <div className="product-grid">
+        <div className="catalog-grid">
           {filtered.map(p => {
             const totalStock = Object.values(p.stock).reduce((a,b)=>a+b,0);
             const isHovered = hoverId === p.id;

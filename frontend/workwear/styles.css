@@ -163,6 +163,13 @@ html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
 
 /* ---------- Product Grid ---------- */
 .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+.catalog-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+  max-width: 1280px;
+  margin: 0 auto;
+}
 .product-card {
   background: var(--surface-glass); backdrop-filter: blur(20px) saturate(140%);
   border: 1px solid var(--border-hairline); border-radius: 18px;
@@ -187,6 +194,13 @@ html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
 
 @media (max-width: 640px) {
   .product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .catalog-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+}
+@media (max-width: 1200px) {
+  .catalog-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 860px) {
+  .catalog-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 /* ---------- Size Selector ---------- */
