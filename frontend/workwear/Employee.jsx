@@ -256,12 +256,12 @@ function EmployeeCatalog({ setScreen, setSelectedProduct }) {
   );
 
   return (
-    <div style={{display:'flex', flexDirection:'column', height:'100%', overflow:'hidden'}}>
+    <div style={{display:'flex', flexDirection:'column', height:'100%', overflow:'hidden', background:'linear-gradient(180deg,#ecf4ff 0%, #e6f0fc 100%)'}}>
       {/* 필터바 + 검색 */}
       <div style={{
         padding:'0 24px',
-        borderBottom:'1px solid #e5e5e5',
-        background:'rgba(255,255,255,0.7)',
+        borderBottom:'1px solid rgba(10,37,64,0.08)',
+        background:'rgba(255,255,255,0.8)',
         backdropFilter:'blur(12px)',
         display:'flex', alignItems:'center', justifyContent:'space-between',
         flexShrink:0
@@ -301,7 +301,7 @@ function EmployeeCatalog({ setScreen, setSelectedProduct }) {
       </div>
 
       {/* 결과 수 */}
-      <div style={{padding:'12px 24px 0', fontSize:12, color:'#757575', fontFamily:"'Pretendard Variable', Pretendard, sans-serif", flexShrink:0}}>
+      <div style={{padding:'12px 24px 0', fontSize:12, color:'var(--fg-3)', fontFamily:"var(--font-sans)", flexShrink:0, fontWeight:500}}>
         {filtered.length}개 상품
       </div>
 
@@ -321,12 +321,15 @@ function EmployeeCatalog({ setScreen, setSelectedProduct }) {
                 onClick={()=>{setSelectedProduct(p); setScreen('detail');}}
                 style={{
                   transform: isHovered ? 'scale(1.03)' : 'scale(1)',
-                  boxShadow: isHovered ? 'var(--shadow-lg)' : 'var(--shadow-sm)',
+                  boxShadow: isHovered ? '0 20px 44px rgba(10,37,64,0.20)' : '0 10px 24px rgba(10,37,64,0.10)',
+                  border:'1px solid rgba(10,37,64,0.10)',
+                  borderRadius:18,
+                  background:'rgba(255,255,255,0.88)',
                   position:'relative',
                 }}
               >
                 {/* 이미지 영역 (카드 2/3) */}
-                <div className="product-thumb" style={{ height:220, fontSize:80, padding:20 }}>
+                <div className="product-thumb" style={{ height:220, fontSize:80, padding:20, background:'linear-gradient(135deg,#eaf4ff 0%,#d4e8fb 100%)' }}>
                   {badgeText && (
                     <span style={{
                       position:'absolute', top:10, left:10,
@@ -364,10 +367,10 @@ function EmployeeCatalog({ setScreen, setSelectedProduct }) {
                 )}
 
                 {/* 상품 정보 */}
-                <div className="product-info">
+                <div className="product-info" style={{background:'rgba(255,255,255,0.92)'}}>
                   <div className="product-cat">{p.cat}</div>
                   <div className="product-name" style={{ marginBottom:8, lineHeight:1.35 }}>{p.name}</div>
-                  <div className="product-pts" style={{ fontSize:16, color:'#111' }}>
+                  <div className="product-pts" style={{ fontSize:16, color:'var(--accent-600)' }}>
                     {fmtPts(p.pts)}<span style={{fontSize:12, fontWeight:500, marginLeft:2}}>P</span>
                   </div>
                 </div>
