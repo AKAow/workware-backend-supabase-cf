@@ -1,0 +1,14 @@
+name = "workware-api"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+
+[vars]
+SUPABASE_URL = "https://YOUR_PROJECT_REF.supabase.co"
+
+[[durable_objects.bindings]]
+name = "RATE_LIMIT"
+class_name = "RateLimitDO"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["RateLimitDO"]
