@@ -77,7 +77,7 @@ function App() {
     switch (screen) {
       case 'home': return <EmployeeHome setScreen={setScreen} setSelectedProduct={setSelectedProduct} setCart={setCart} openCart={() => setCartOpen(true)} />;
       case 'catalog': return <EmployeeCatalog setScreen={setScreen} setSelectedProduct={setSelectedProduct} />;
-      case 'detail': return <ProductDetail product={selectedProduct} setScreen={setScreen} cart={cart} setCart={setCart} openCart={() => setCartOpen(true)} />;
+      case 'detail': return <ProductDetail product={selectedProduct} setSelectedProduct={setSelectedProduct} setScreen={setScreen} cart={cart} setCart={setCart} openCart={() => setCartOpen(true)} />;
       case 'orders': return <EmployeeOrders />;
       case 'admin-dashboard': return <AdminDashboard setScreen={setScreen} />;
       case 'admin-orders': return <AdminOrders />;

@@ -289,7 +289,8 @@ function EmployeeCatalog({ setScreen, setSelectedProduct }) {
 }
 
 /* ---- 상품 상세 화면 (나이키 스타일) ---- */
-function ProductDetail({ product, setScreen, cart, setCart, openCart }) {
+function ProductDetail({ product, setScreen, setSelectedProduct, cart, setCart, openCart }) {
+  const store = useStore();
   const [size, setSize] = useEmp(null);
   const [added, setAdded] = useEmp(false);
   const [activeThumb, setActiveThumb] = useEmp(0);
@@ -306,6 +307,7 @@ function ProductDetail({ product, setScreen, cart, setCart, openCart }) {
     { bg:'#f4f4f4', label:'디테일' },
     { bg:'#efefef', label:'착용' },
   ];
+  const recommendations = store.products.filter(p => p.id !== product.id).slice(0, 3);
 
   function addToCart() {
     if (!size) return;
@@ -337,7 +339,7 @@ function ProductDetail({ product, setScreen, cart, setCart, openCart }) {
       </div>
 
       {/* 본문 */}
-      <div style={{display:'grid', gridTemplateColumns:'58px 1fr 420px', gap:0, padding:'32px 24px', maxWidth:1100, margin:'0 auto'}}>
+      <div style={{display:'grid', gridTemplateColumns:'58px 1fr 420px', gap:0, padding:'32px 24px 18px', maxWidth:1100, margin:'0 auto'}}>
 
         {/* 좌측 세로 썸네일 */}
         <div style={{display:'flex', flexDirection:'column', gap:8, paddingRight:12}}>
@@ -468,6 +470,29 @@ function ProductDetail({ product, setScreen, cart, setCart, openCart }) {
                   {d.content}
                 </div>
               )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* 다른 제품 추천 */}
+      <div style={{maxWidth:1100, margin:'0 auto', padding:'20px 24px 48px'}}>
+        <div style={{fontSize:20, fontWeight:800, color:'#111', marginBottom:6, letterSpacing:'-0.02em', fontFamily:NKF}}>다른 제품 추천</div>
+        <div style={{fontSize:13, color:'#757575', marginBottom:18, fontFamily:NKF}}>비슷한 카테고리의 다른 제품을 확인해보세요.</div>
+        <div style={{display:'grid', gridTemplateColumns:'repeat(3, minmax(0,1fr))', gap:16}}>
+          {recommendations.map(p => (
+            <div key={p.id} onClick={()=>{ setSelectedProduct?.(p); setScreen('detail'); }} style={{cursor:'pointer'}}>
+              <div style={{
+                aspectRatio:'1 / 1',
+                background:'#f5f5f5',
+                display:'flex',
+                alignItems:'center',
+                justifyContent:'center',
+                fontSize:'clamp(52px, 8vw, 74px)',
+              }}>{p.thumb}</div>
+              <div style={{marginTop:10, fontSize:12, color:'#8d8d8f', fontWeight:600, fontFamily:NKF}}>{p.cat}</div>
+              <div style={{marginTop:2, fontSize:17, color:'#111', fontWeight:700, lineHeight:1.28, letterSpacing:'-0.01em', fontFamily:NKF}}>{p.name}</div>
+              <div style={{marginTop:8, fontSize:16, color:'#111', fontWeight:700, fontFamily:NKF}}>{fmtPts(p.pts)}P</div>
             </div>
           ))}
         </div>
