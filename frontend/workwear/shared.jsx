@@ -4,16 +4,38 @@
 const EMPLOYEE = { name: '김민준', dept: '생산 1팀', points: 15000, used: 8500, avatar: '김' };
 
 const WORKWEAR_COLORS = {
-  navy: { id:'navy', name:'네이비', value:'#1F3245' },
-  charcoal: { id:'charcoal', name:'차콜', value:'#3D4147' },
-  black: { id:'black', name:'블랙', value:'#111111' },
-  gray: { id:'gray', name:'그레이', value:'#8A8F98' },
-  beige: { id:'beige', name:'베이지', value:'#C8B89A' },
-  khaki: { id:'khaki', name:'카키', value:'#68745E' },
-  orange: { id:'orange', name:'오렌지', value:'#F47B20' },
-  yellow: { id:'yellow', name:'형광 옐로우', value:'#D7F23A' },
-  blue: { id:'blue', name:'블루', value:'#2F80ED' },
-  white: { id:'white', name:'화이트', value:'#F8F8F4' },
+  navy:         { id:'navy',         name:'네이비',        value:'#1F3245' },
+  deepnavy:     { id:'deepnavy',     name:'딥네이비',      value:'#0D1B2A' },
+  charcoal:     { id:'charcoal',     name:'차콜',          value:'#3D4147' },
+  charcoalgray: { id:'charcoalgray', name:'차콜 그레이',   value:'#4A4E57' },
+  graphitegray: { id:'graphitegray', name:'그라파이트 그레이', value:'#4A4A4A' },
+  darkgray:     { id:'darkgray',     name:'다크그레이',    value:'#4A5568' },
+  paintergray:  { id:'paintergray',  name:'페인터 그레이', value:'#787F86' },
+  gunmetalgray: { id:'gunmetalgray', name:'GUNMETAL GRAY', value:'#636E72' },
+  gray:         { id:'gray',         name:'그레이',        value:'#8A8F98' },
+  black:        { id:'black',        name:'블랙',          value:'#111111' },
+  smokeblack:   { id:'smokeblack',   name:'스모크 블랙',   value:'#2D2D2D' },
+  woodblack:    { id:'woodblack',    name:'WOOD BLACK',    value:'#1A1610' },
+  white:        { id:'white',        name:'화이트',        value:'#F8F8F4' },
+  beige:        { id:'beige',        name:'베이지',        value:'#C8B89A' },
+  dustbeige:    { id:'dustbeige',    name:'DUST BEIGE',    value:'#C4AA8A' },
+  oakbeige:     { id:'oakbeige',     name:'OAK BEIGE',     value:'#BEA987' },
+  stonebeige:   { id:'stonebeige',   name:'STONE BEIGE',   value:'#B5A49A' },
+  tanbeige:     { id:'tanbeige',     name:'탄 베이지',     value:'#C4A882' },
+  coyotetan:    { id:'coyotetan',    name:'COYOTE TAN',    value:'#81613C' },
+  khaki:        { id:'khaki',        name:'카키',          value:'#68745E' },
+  ranggreen:    { id:'ranggreen',    name:'RANGER GREEN',  value:'#5B6842' },
+  sagegreen:    { id:'sagegreen',    name:'SAGE GREEN',    value:'#7D9B6F' },
+  lightgreen:   { id:'lightgreen',   name:'라이트그린',    value:'#78C26D' },
+  orange:       { id:'orange',       name:'오렌지',        value:'#F47B20' },
+  mechanic:     { id:'mechanic',     name:'미케닉 오렌지', value:'#E8621A' },
+  yellow:       { id:'yellow',       name:'옐로우',        value:'#F5C518' },
+  neonyellow:   { id:'neonyellow',   name:'네온옐로우',    value:'#C8F000' },
+  blue:         { id:'blue',         name:'블루',          value:'#2F80ED' },
+  royalblue:    { id:'royalblue',    name:'로얄블루',      value:'#2B4ABA' },
+  lightblue:    { id:'lightblue',    name:'라이트블루',    value:'#5B9BD5' },
+  dustblue:     { id:'dustblue',     name:'더스트 블루',   value:'#6B8CAE' },
+  purple:       { id:'purple',       name:'퍼플',          value:'#7B4FA6' },
 };
 
 function resolveWorkwearColor(color) {
@@ -21,21 +43,39 @@ function resolveWorkwearColor(color) {
   if (/^#[0-9a-f]{6}$/i.test(raw)) {
     return { id: raw.slice(1).toLowerCase(), name: raw, value: raw };
   }
-  const key = raw.toLowerCase();
   const aliases = {
-    네이비:'navy', navy:'navy',
-    차콜:'charcoal', charcoal:'charcoal',
-    블랙:'black', black:'black',
-    그레이:'gray', gray:'gray', grey:'gray',
-    베이지:'beige', beige:'beige',
-    카키:'khaki', khaki:'khaki',
-    오렌지:'orange', orange:'orange',
-    형광옐로우:'yellow', '형광 옐로우':'yellow', 옐로우:'yellow', yellow:'yellow',
-    블루:'blue', blue:'blue',
-    화이트:'white', white:'white',
+    // 한국어
+    '네이비':'navy', '딥네이비':'deepnavy',
+    '차콜':'charcoal', '차콜 그레이':'charcoalgray',
+    '그라파이트 그레이':'graphitegray', '다크그레이':'darkgray',
+    '페인터 그레이':'paintergray', '그레이':'gray', '그레이':'gray',
+    '블랙':'black', '스모크 블랙':'smokeblack',
+    '화이트':'white',
+    '베이지':'beige', '탄 베이지':'tanbeige',
+    '카키':'khaki', '라이트그린':'lightgreen',
+    '오렌지':'orange', '미케닉 오렌지':'mechanic',
+    '옐로우':'yellow', '네온옐로우':'neonyellow', '형광 옐로우':'neonyellow', '형광옐로우':'neonyellow',
+    '블루':'blue', '로얄블루':'royalblue', '라이트블루':'lightblue', '더스트 불루':'dustblue', '더스트 블루':'dustblue',
+    '퍼플':'purple',
+    // English
+    'navy':'navy', 'deep navy':'deepnavy',
+    'charcoal':'charcoal', 'charcoal gray':'charcoalgray',
+    'graphite gray':'graphitegray', 'dark gray':'darkgray', 'dark grey':'darkgray',
+    'painter gray':'paintergray', 'gunmetal gray':'gunmetalgray', 'gunmetal grey':'gunmetalgray',
+    'gray':'gray', 'grey':'gray',
+    'black':'black', 'smoke black':'smokeblack', 'wood black':'woodblack',
+    'white':'white',
+    'beige':'beige', 'dust beige':'dustbeige', 'oak beige':'oakbeige',
+    'stone beige':'stonebeige', 'tan beige':'tanbeige', 'coyote tan':'coyotetan',
+    'khaki':'khaki', 'ranger green':'ranggreen', 'sage green':'sagegreen', 'light green':'lightgreen',
+    'orange':'orange', 'mechanic orange':'mechanic',
+    'yellow':'yellow', 'neon yellow':'neonyellow',
+    'blue':'blue', 'royal blue':'royalblue', 'light blue':'lightblue', 'dust blue':'dustblue',
+    'purple':'purple',
   };
-  const id = aliases[raw] || aliases[key] || key.replace(/\s+/g, '-') || 'default';
-  return WORKWEAR_COLORS[id] || { id, name: raw || '기본', value:'#8A8F98' };
+  const key = raw.toLowerCase();
+  const id = aliases[raw] || aliases[key] || key.replace(/\s+/g,'-');
+  return WORKWEAR_COLORS[id] || { id: id || 'default', name: raw || '기본', value:'#8A8F98' };
 }
 
 const PRODUCTS = [
