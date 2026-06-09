@@ -188,11 +188,17 @@ const WW = {
       id: u.id, name: u.full_name || u.email, dept: '-', position: u.role, pts: Number(u.point_balance || 0), total_used: 0, joinDate: String(u.created_at || '').slice(0, 10),
     }));
     EMPLOYEE.points = Number(myPoints?.balance || EMPLOYEE.points);
-    if (myPoints?.full_name) {
-      EMPLOYEE.name   = myPoints.full_name;
-      EMPLOYEE.avatar = myPoints.full_name.charAt(0);
+    // 프로필 직접 조회 (Worker 경유 없이 Supabase 클라이언트로)
+    const { data: profileRow } = await WW_SUPABASE.from('profiles')
+      .select('full_name, departments(name)')
+      .eq('id', user.id)
+      .single()
+      .catch(() => ({ data: null }));
+    if (profileRow?.full_name) {
+      EMPLOYEE.name   = profileRow.full_name;
+      EMPLOYEE.avatar = profileRow.full_name.charAt(0);
     }
-    if (myPoints?.department) EMPLOYEE.dept = myPoints.department;
+    if (profileRow?.departments?.name) EMPLOYEE.dept = profileRow.departments.name;
     window._store.pub();
   },
 };
