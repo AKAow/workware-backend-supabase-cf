@@ -192,8 +192,7 @@ const WW = {
     const { data: profileRow } = await WW_SUPABASE.from('profiles')
       .select('full_name, departments(name)')
       .eq('id', user.id)
-      .single()
-      .catch(() => ({ data: null }));
+      .single();
     if (profileRow?.full_name) {
       EMPLOYEE.name   = profileRow.full_name;
       EMPLOYEE.avatar = profileRow.full_name.charAt(0);
