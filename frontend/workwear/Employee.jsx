@@ -377,7 +377,15 @@ function ProductDetail({ product, setScreen, setSelectedProduct, cart, setCart, 
       </div>
 
       {/* 본문 */}
-      <div style={{display:'grid', gridTemplateColumns:'58px 1fr 420px', gap:0, padding:'32px 24px 18px', maxWidth:1100, margin:'0 auto'}}>
+      <div style={{
+        display:'grid',
+        gridTemplateColumns:'58px minmax(0, 1fr) 420px',
+        gap:0,
+        padding:'32px 24px 18px',
+        maxWidth:1100,
+        margin:'0 auto',
+        alignItems:'start',
+      }}>
 
         {/* 좌측 세로 썸네일 */}
         <div style={{display:'flex', flexDirection:'column', gap:8, paddingRight:12}}>
@@ -399,8 +407,9 @@ function ProductDetail({ product, setScreen, setSelectedProduct, cart, setCart, 
         <div style={{
           background:'linear-gradient(145deg,#f7f7f7,#eeeeee)',
           borderRadius:4, display:'flex', alignItems:'center', justifyContent:'center',
-          fontSize:140, minHeight:480, marginRight:40,
+          fontSize:140, height:704, maxHeight:'calc(100vh - 190px)', minHeight:520, marginRight:40,
           position:'relative',
+          alignSelf:'start',
         }}>
           <span style={{filter:'drop-shadow(0 12px 32px rgba(0,0,0,0.12))'}}>{product.thumb}</span>
           {product.tag==='인기' && (
@@ -409,7 +418,7 @@ function ProductDetail({ product, setScreen, setSelectedProduct, cart, setCart, 
         </div>
 
         {/* 우측 상품 정보 */}
-        <div style={{display:'flex', flexDirection:'column', gap:0, paddingTop:4}}>
+        <div style={{display:'flex', flexDirection:'column', gap:0, paddingTop:4, alignSelf:'start'}}>
           {/* 카테고리 + 이름 + 가격 */}
           <div style={{fontSize:12, color:'#757575', fontFamily:NKF, fontWeight:500, marginBottom:6}}>{product.cat}</div>
           <h1 style={{margin:'0 0 4px', fontSize:24, fontWeight:800, color:'#111', fontFamily:NKF, lineHeight:1.2, letterSpacing:'-0.02em'}}>{product.name}</h1>
