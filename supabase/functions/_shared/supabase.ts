@@ -22,7 +22,7 @@ export async function requireUser(req: Request, supabase = adminClient()) {
 export async function getProfile(supabase: ReturnType<typeof adminClient>, userId: string) {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id,email,role,department_id,point_balance')
+    .select('id,email,full_name,role,department_id,point_balance,departments(name)')
     .eq('id', userId)
     .single();
 

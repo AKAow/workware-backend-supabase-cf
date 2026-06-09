@@ -188,6 +188,11 @@ const WW = {
       id: u.id, name: u.full_name || u.email, dept: '-', position: u.role, pts: Number(u.point_balance || 0), total_used: 0, joinDate: String(u.created_at || '').slice(0, 10),
     }));
     EMPLOYEE.points = Number(myPoints?.balance || EMPLOYEE.points);
+    if (myPoints?.full_name) {
+      EMPLOYEE.name   = myPoints.full_name;
+      EMPLOYEE.avatar = myPoints.full_name.charAt(0);
+    }
+    if (myPoints?.department) EMPLOYEE.dept = myPoints.department;
     window._store.pub();
   },
 };
