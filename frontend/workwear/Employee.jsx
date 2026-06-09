@@ -266,18 +266,20 @@ function EmployeeCatalog({ setScreen, setSelectedProduct }) {
   return (
     <div className="nike-catalog">
       <div className="nike-catalog-head">
-        <div className="nike-cats">
-          {cats.map(c => (
-            <button key={c} onClick={()=>setCat(c)} className={cat===c ? 'active' : ''}>{c}</button>
-          ))}
-        </div>
-        <div className="nike-search">
-          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-          <input placeholder="상품 검색" value={search} onChange={e=>setSearch(e.target.value)} />
+        <div className="nike-catalog-inner">
+          <div className="nike-cats">
+            {cats.map(c => (
+              <button key={c} onClick={()=>setCat(c)} className={cat===c ? 'active' : ''}>{c}</button>
+            ))}
+          </div>
+          <div className="nike-search">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <input placeholder="상품 검색" value={search} onChange={e=>setSearch(e.target.value)} />
+          </div>
         </div>
       </div>
 
-      <div className="nike-count">{filtered.length}개 상품</div>
+      <div className="nike-count"><div className="nike-catalog-inner">{filtered.length}개 상품</div></div>
 
       <div className="nike-catalog-body">
         <div className="nike-grid">
