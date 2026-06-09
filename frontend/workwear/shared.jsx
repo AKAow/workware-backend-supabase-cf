@@ -78,6 +78,30 @@ function resolveWorkwearColor(color) {
   return WORKWEAR_COLORS[id] || { id: id || 'default', name: raw || '기본', value:'#8A8F98' };
 }
 
+const PRODUCT_META_PREFIX = 'WWMETA:';
+function parseProductMeta(description) {
+  const raw = String(description || '');
+  if (!raw.startsWith(PRODUCT_META_PREFIX)) return { summary: raw };
+  try {
+    const meta = JSON.parse(raw.slice(PRODUCT_META_PREFIX.length));
+    return { summary: '', ...meta };
+  } catch (_) {
+    return { summary: raw };
+  }
+}
+
+function stringifyProductMeta(product) {
+  return PRODUCT_META_PREFIX + JSON.stringify({
+    summary: product.desc || '',
+    detailInfo: product.detailInfo || '',
+    shippingInfo: product.shippingInfo || '',
+    returnInfo: product.returnInfo || '',
+    thumbnail: product.thumb || '📦',
+    badge: product.tag || '',
+    featured: !!product.featured,
+  });
+}
+
 const PRODUCTS = [
   { id:1, name:'방한 작업복 상의', cat:'상의', pts:4500, thumb:'🧥', colors:[WORKWEAR_COLORS.navy, WORKWEAR_COLORS.charcoal, WORKWEAR_COLORS.black], sizes:['S','M','L','XL','2XL'], stock:{S:10,M:15,L:8,XL:3,'2XL':0}, tag:'인기' },
   { id:2, name:'방한 작업복 하의', cat:'하의', pts:3800, thumb:'👖', colors:[WORKWEAR_COLORS.navy, WORKWEAR_COLORS.charcoal, WORKWEAR_COLORS.black], sizes:['S','M','L','XL','2XL'], stock:{S:5,M:12,L:10,XL:6,'2XL':2} },
@@ -166,7 +190,16 @@ const WW = {
     if (error) throw error;
   },
   async signOut() { if (WW_SUPABASE) await WW_SUPABASE.auth.signOut(); },
-  listProducts: () => wwApi('/products'),
+  listProducts: async () => {
+    if (!WW_SUPABASE) return wwApi('/products');
+    const { data, error } = await WW_SUPABASE.from('products').select('*').order('created_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  },
+  createProduct: (payload) => wwApi('/products', { method: 'POST', body: JSON.stringify(payload) }),
+  updateProduct: (id, payload) => wwApi(`/products/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  createVariant: (productId, payload) => wwApi(`/products/${productId}/variants`, { method: 'POST', body: JSON.stringify(payload) }),
+  updateVariantStock: (variantId, stock_qty) => wwApi(`/products/variants/${variantId}`, { method: 'PUT', body: JSON.stringify({ stock_qty }) }),
   listMyOrders: () => wwApi('/orders'),
   listAdminOrders: () => wwApi('/admin/orders'),
   listUsers: () => wwApi('/admin/users'),
@@ -214,9 +247,19 @@ const WW = {
         acc[color.id][String(v.size)] = v.id;
         return acc;
       }, {});
+      const meta = parseProductMeta(p.description);
       return {
         id: p.id, name: p.name, cat: p.category || '기타', pts: Number(p.point_price || 0),
-        thumb: '📦', colors, sizes, stock, stockByColorSize, variantBySize, variantByColorSize, tag: '', active: !!p.is_active, featured: false, desc: p.description || '',
+        thumb: p.thumbnail || meta.thumbnail || '📦',
+        imageUrl: p.image_url || '',
+        colors, sizes, stock, stockByColorSize, variantBySize, variantByColorSize,
+        tag: p.badge || meta.badge || '',
+        active: !!p.is_active,
+        featured: !!p.is_featured || !!meta.featured,
+        desc: meta.summary || (!String(p.description || '').startsWith(PRODUCT_META_PREFIX) ? p.description || '' : ''),
+        detailInfo: p.detail_info || meta.detailInfo || '',
+        shippingInfo: p.shipping_info || meta.shippingInfo || '',
+        returnInfo: p.return_info || meta.returnInfo || '',
       };
     }));
     window._store.products = detailedProducts;

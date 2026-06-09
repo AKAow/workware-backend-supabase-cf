@@ -66,7 +66,7 @@ function EmployeeHome({ setScreen, setSelectedProduct, setCart }) {
     });
   }
 
-  const featured = store.products.slice(0, 8);
+  const featured = store.products.filter(p => p.active).slice(0, 8);
   const recentOrders = store.orders.slice(0, 2);
 
   const card = {
@@ -259,6 +259,7 @@ function EmployeeCatalog({ setScreen, setSelectedProduct }) {
   const cats = ['전체', '상의', '하의', '신발', '보호구', '장갑', '안전', '동계용', '우천용'];
 
   const filtered = store.products.filter(p =>
+    p.active &&
     (cat === '전체' || p.cat === cat) &&
     (search === '' || p.name.includes(search))
   );
@@ -338,7 +339,7 @@ function ProductDetail({ product, setScreen, setSelectedProduct, cart, setCart, 
     { bg:'#f4f4f4', label:'디테일' },
     { bg:'#efefef', label:'착용' },
   ];
-  const recommendations = store.products.filter(p => p.id !== product.id).slice(0, 3);
+  const recommendations = store.products.filter(p => p.active && p.id !== product.id).slice(0, 3);
 
   function addToCart() {
     if (!canAddToCart) return;
@@ -411,7 +412,9 @@ function ProductDetail({ product, setScreen, setSelectedProduct, cart, setCart, 
           position:'relative',
           alignSelf:'start',
         }}>
-          <span style={{filter:'drop-shadow(0 12px 32px rgba(0,0,0,0.12))'}}>{product.thumb}</span>
+          {product.imageUrl
+            ? <img src={product.imageUrl} alt={product.name} style={{maxWidth:'72%', maxHeight:'72%', objectFit:'contain', filter:'drop-shadow(0 12px 32px rgba(0,0,0,0.12))'}}/>
+            : <span style={{filter:'drop-shadow(0 12px 32px rgba(0,0,0,0.12))'}}>{product.thumb}</span>}
           {product.tag==='인기' && (
             <span style={{position:'absolute',top:20,left:20,fontSize:11,fontWeight:600,color:'var(--accent-600)',background:'var(--accent-050)',border:'1px solid var(--accent-200)',borderRadius:9999,padding:'3px 10px',fontFamily:NKF}}>인기</span>
           )}
@@ -544,9 +547,9 @@ function ProductDetail({ product, setScreen, setSelectedProduct, cart, setCart, 
 
           {/* ── disclosure rows ── */}
           {[
-            { key:'info',    label:'상품 정보',   content:'100% 폴리에스터 소재, 현장 작업에 최적화된 내구성 원단. 반사 테이프 적용으로 야간 안전성 확보.' },
-            { key:'ship',    label:'배송 안내',    content:'승인 후 2~3 영업일 내 발송. 사내 물류팀을 통해 근무지로 배송됩니다.' },
-            { key:'return',  label:'교환·반품',    content:'수령 후 7일 이내 미착용 상태에서 교환 가능. 담당자에게 문의 후 반품 절차 안내 받으세요.' },
+            { key:'info',    label:'상품 정보',   content: product.detailInfo || product.desc || '100% 폴리에스터 소재, 현장 작업에 최적화된 내구성 원단. 반사 테이프 적용으로 야간 안전성 확보.' },
+            { key:'ship',    label:'배송 안내',    content: product.shippingInfo || '승인 후 2~3 영업일 내 발송. 사내 물류팀을 통해 근무지로 배송됩니다.' },
+            { key:'return',  label:'교환·반품',    content: product.returnInfo || '수령 후 7일 이내 미착용 상태에서 교환 가능. 담당자에게 문의 후 반품 절차 안내 받으세요.' },
           ].map(d => (
             <div key={d.key} style={{ borderTop:'1px solid #e5e5e5' }}>
               <button
@@ -588,7 +591,7 @@ function ProductDetail({ product, setScreen, setSelectedProduct, cart, setCart, 
                 alignItems:'center',
                 justifyContent:'center',
                 fontSize:'clamp(52px, 8vw, 74px)',
-              }}>{p.thumb}</div>
+              }}>{p.imageUrl ? <img src={p.imageUrl} alt={p.name} style={{maxWidth:'70%', maxHeight:'70%', objectFit:'contain'}}/> : p.thumb}</div>
               <div style={{marginTop:10, fontSize:12, color:'#8d8d8f', fontWeight:600, fontFamily:NKF}}>{p.cat}</div>
               <div style={{marginTop:2, fontSize:17, color:'#111', fontWeight:700, lineHeight:1.28, letterSpacing:'-0.01em', fontFamily:NKF}}>{p.name}</div>
               <div style={{marginTop:8, fontSize:16, color:'#111', fontWeight:700, fontFamily:NKF}}>{fmtPts(p.pts)}P</div>

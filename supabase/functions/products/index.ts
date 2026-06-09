@@ -59,7 +59,7 @@ async function createProduct({ req, supabase, userId }: Ctx) {
   const body = await req.json().catch(() => null);
   if (!body?.name || !body?.point_price) return error(400, 'VALIDATION_ERROR', 'name, point_price는 필수입니다.');
 
-  const { data, error: createErr } = await supabase.from('products').insert(body).select('*').single();
+  const { data, error: createErr } = await supabase.from('products').insert(productPayload(body)).select('*').single();
   if (createErr) return error(400, 'VALIDATION_ERROR', createErr.message);
   return json(data, 201);
 }
@@ -67,9 +67,21 @@ async function createProduct({ req, supabase, userId }: Ctx) {
 async function updateProduct({ req, supabase, userId }: Ctx, productId: string) {
   if (!(await requireAdmin(supabase, userId))) return error(403, 'FORBIDDEN', '관리자만 수정할 수 있습니다.');
   const body = await req.json().catch(() => null);
-  const { data, error: updateErr } = await supabase.from('products').update(body ?? {}).eq('id', productId).select('*').single();
+  const { data, error: updateErr } = await supabase.from('products').update(productPayload(body ?? {}, false)).eq('id', productId).select('*').single();
   if (updateErr) return error(400, 'VALIDATION_ERROR', updateErr.message);
   return json(data);
+}
+
+function productPayload(body: Record<string, unknown>, requirePrice = true) {
+  const payload: Record<string, unknown> = {};
+  const textFields = ['name', 'description', 'image_url', 'category', 'detail_info', 'shipping_info', 'return_info', 'thumbnail', 'badge'];
+  textFields.forEach((key) => {
+    if (Object.prototype.hasOwnProperty.call(body, key)) payload[key] = body[key] === '' ? null : body[key];
+  });
+  if (Object.prototype.hasOwnProperty.call(body, 'point_price') || requirePrice) payload.point_price = Number(body.point_price);
+  if (Object.prototype.hasOwnProperty.call(body, 'is_active')) payload.is_active = Boolean(body.is_active);
+  if (Object.prototype.hasOwnProperty.call(body, 'is_featured')) payload.is_featured = Boolean(body.is_featured);
+  return payload;
 }
 
 async function deactivateProduct({ supabase, userId }: Ctx, productId: string) {

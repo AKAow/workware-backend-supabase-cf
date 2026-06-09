@@ -434,13 +434,106 @@ function AdminProductMgmt() {
   const store = useStore();
   const [editing, setEditing] = React.useState(null);
   const [search, setSearch] = React.useState('');
+  const [saving, setSaving] = React.useState(false);
   const PF = "var(--font-sans)";
   const CATS = ['상의','하의','신발','보호구','장갑','안전','동계용','우천용'];
+  const DEFAULT_DETAIL = '100% 폴리에스터 소재, 현장 작업에 최적화된 내구성 원단. 반사 테이프 적용으로 야간 안전성 확보.';
+  const DEFAULT_SHIPPING = '승인 후 2~3 영업일 내 발송. 사내 물류팀을 통해 근무지로 배송됩니다.';
+  const DEFAULT_RETURN = '수령 후 7일 이내 미착용 상태에서 교환 가능. 담당자에게 문의 후 반품 절차 안내 받으세요.';
+  const isUuid = id => /^[0-9a-fA-F-]{36}$/.test(String(id || ''));
+  const splitTokens = value => String(value || '').split(',').map(s => s.trim()).filter(Boolean);
+  const totalStockOf = p => Object.values(p.stock || {}).reduce((a,b)=>a+Number(b || 0),0);
+  const editProduct = p => ({
+    ...p,
+    imageUrl: p.imageUrl || '',
+    stockByColorSize: p.stockByColorSize || (p.colors || []).reduce((acc, color) => ({
+      ...acc,
+      [color.id]: (p.sizes || []).reduce((row, size) => ({ ...row, [size]: Number(p.stock?.[size] || 0) }), {}),
+    }), {}),
+    detailInfo: p.detailInfo || p.desc || DEFAULT_DETAIL,
+    shippingInfo: p.shippingInfo || DEFAULT_SHIPPING,
+    returnInfo: p.returnInfo || DEFAULT_RETURN,
+    colorText: (p.colors || []).map(c => c.name).join(', '),
+    sizeText: (p.sizes || []).join(', '),
+  });
 
-  function toggleActive(id) { store.products = store.products.map(p => p.id===id ? {...p, active:!p.active} : p); store.pub(); }
-  function saveProduct(prod) {
-    store.products = store.products.find(p => p.id===prod.id) ? store.products.map(p => p.id===prod.id ? prod : p) : [...store.products, prod];
-    store.pub(); setEditing(null);
+  async function toggleActive(id) {
+    const target = store.products.find(p => p.id === id);
+    const nextActive = !target?.active;
+    store.products = store.products.map(p => p.id===id ? {...p, active:nextActive} : p);
+    store.pub();
+    if (isUuid(id) && WW?.updateProduct) {
+      try { await WW.updateProduct(id, { is_active: nextActive }); }
+      catch (e) { alert(e.message || '판매 상태 저장에 실패했습니다.'); }
+    }
+  }
+
+  async function saveProduct(prod) {
+    setSaving(true);
+    try {
+      const colors = splitTokens(prod.colorText).map(resolveWorkwearColor);
+      const sizes = splitTokens(prod.sizeText);
+      const normalized = {
+        ...prod,
+        colors,
+        sizes,
+        stockByColorSize: colors.reduce((acc, color) => ({
+          ...acc,
+          [color.id]: sizes.reduce((row, s) => ({
+            ...row,
+            [s]: Number(prod.stockByColorSize?.[color.id]?.[s] ?? prod.stock?.[s] ?? 0),
+          }), {}),
+        }), {}),
+        stock: sizes.reduce((acc, s) => ({
+          ...acc,
+          [s]: colors.length
+            ? colors.reduce((sum, color) => sum + Number(prod.stockByColorSize?.[color.id]?.[s] ?? prod.stock?.[s] ?? 0), 0)
+            : Number(prod.stock?.[s] || 0),
+        }), {}),
+        detailInfo: prod.detailInfo || prod.desc || DEFAULT_DETAIL,
+        shippingInfo: prod.shippingInfo || DEFAULT_SHIPPING,
+        returnInfo: prod.returnInfo || DEFAULT_RETURN,
+      };
+      const payload = {
+        name: normalized.name,
+        category: normalized.cat,
+        point_price: Number(normalized.pts || 0),
+        image_url: normalized.imageUrl || null,
+        description: stringifyProductMeta(normalized),
+        is_active: !!normalized.active,
+      };
+      let saved = normalized;
+      if (WW?.client && WW?.updateProduct) {
+        const productRow = isUuid(normalized.id)
+          ? await WW.updateProduct(normalized.id, payload)
+          : await WW.createProduct(payload);
+        saved = { ...normalized, id: productRow.id };
+        for (const size of sizes) {
+          const qty = Number(normalized.stock[size] || 0);
+          if (colors.length) {
+            for (const color of colors) {
+              const colorQty = Number(normalized.stockByColorSize?.[color.id]?.[size] || 0);
+              const variantId = normalized.variantByColorSize?.[color.id]?.[size];
+              if (variantId) await WW.updateVariantStock(variantId, colorQty);
+              else await WW.createVariant(productRow.id, { size, color: color.name, stock_qty: colorQty });
+            }
+          } else {
+            const variantId = normalized.variantBySize?.[size];
+            if (variantId) await WW.updateVariantStock(variantId, qty);
+            else await WW.createVariant(productRow.id, { size, color: null, stock_qty: qty });
+          }
+        }
+        await WW.bootstrap();
+      } else {
+        store.products = store.products.find(p => p.id===saved.id) ? store.products.map(p => p.id===saved.id ? saved : p) : [...store.products, saved];
+        store.pub();
+      }
+      setEditing(null);
+    } catch (e) {
+      alert(e.message || '상품 저장에 실패했습니다.');
+    } finally {
+      setSaving(false);
+    }
   }
 
   const Toggle = ({ on, onChange }) => (
@@ -451,16 +544,26 @@ function AdminProductMgmt() {
 
   if (editing) {
     const f = editing; const setF = setEditing;
-    const totalStock = Object.values(f.stock).reduce((a,b)=>a+b,0);
+    const sizes = splitTokens(f.sizeText || (f.sizes || []).join(', '));
+    const colors = splitTokens(f.colorText || '').map(resolveWorkwearColor);
+    const totalStock = colors.length
+      ? colors.reduce((sum, c) => sum + sizes.reduce((rowSum, s) => rowSum + Number(f.stockByColorSize?.[c.id]?.[s] || 0), 0), 0)
+      : sizes.reduce((sum, s) => sum + Number(f.stock?.[s] || 0), 0);
     return (
       <div className="content">
         <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:4 }}>
           <button className="btn btn-secondary btn-sm" onClick={() => setEditing(null)}><Icon name="chevronL"/> 목록</button>
           <span style={{ fontFamily:'var(--font-display)', fontWeight:600, fontSize:16, color:'var(--fg-1)' }}>{f.id > 1e12 ? '상품 추가' : '상품 수정'}</span>
+          <span className={`chip ${f.active ? 'chip-ok' : 'chip-neutral'}`}>{f.active ? '판매중' : '비활성'}</span>
         </div>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 260px', gap:18, alignItems:'start' }}>
-          <div className="glass-card" style={{ display:'flex', flexDirection:'column', gap:15 }}>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+        <div style={{ display:'grid', gridTemplateColumns:'minmax(0, 1fr) 300px', gap:18, alignItems:'start' }}>
+          <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+            <div className="glass-card" style={{ display:'flex', flexDirection:'column', gap:14, borderRadius:16 }}>
+              <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                <div style={{fontSize:15, fontWeight:800, color:'var(--fg-1)', fontFamily:'var(--font-display)'}}>기본 정보</div>
+                <div style={{fontSize:12, color:'var(--fg-3)', fontFamily:PF}}>직원 카탈로그와 상세 상단에 표시됩니다.</div>
+              </div>
+              <div style={{ display:'grid', gridTemplateColumns:'1.4fr 1fr', gap:12 }}>
               <div><label className="form-label">상품명</label><input className="form-input" value={f.name} onChange={e => setF(p => ({...p, name:e.target.value}))} placeholder="상품명"/></div>
               <div><label className="form-label">카테고리</label>
                 <select className="form-select" value={f.cat} onChange={e => setF(p => ({...p, cat:e.target.value}))}>
@@ -477,44 +580,98 @@ function AdminProductMgmt() {
                 </select>
               </div>
             </div>
-            <div><label className="form-label">상품 설명</label><textarea className="form-input" rows={3} value={f.desc||''} onChange={e => setF(p => ({...p, desc:e.target.value}))} style={{ resize:'vertical' }} placeholder="상품 상세 설명"/></div>
-            <div>
-              <label className="form-label">사이즈별 재고</label>
-              <div style={{ display:'flex', gap:12, flexWrap:'wrap' }}>
-                {f.sizes.map(s => (
-                  <div key={s} style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:5 }}>
-                    <div style={{ fontSize:11, fontWeight:600, color:'var(--fg-3)', fontFamily:PF }}>{s}</div>
-                    <input type="number" value={f.stock[s]||0} onChange={e => setF(p => ({...p, stock:{...p.stock, [s]:parseInt(e.target.value)||0}}))}
-                      style={{ width:56, textAlign:'center', padding:'7px 4px', borderRadius:9, border:'1px solid var(--border-hairline)', fontFamily:PF, fontSize:14, background:'rgba(255,255,255,0.8)' }}/>
-                  </div>
-                ))}
+              <div><label className="form-label">이미지 URL</label><input className="form-input" value={f.imageUrl||''} onChange={e => setF(p => ({...p, imageUrl:e.target.value}))} placeholder="https://..."/></div>
+            </div>
+
+            <div className="glass-card" style={{ display:'flex', flexDirection:'column', gap:12, borderRadius:16 }}>
+              <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                <div style={{fontSize:15, fontWeight:800, color:'var(--fg-1)', fontFamily:'var(--font-display)'}}>상세페이지 문구</div>
+                <div style={{fontSize:12, color:'var(--fg-3)', fontFamily:PF}}>직원 상품 상세 아코디언에 그대로 표시됩니다.</div>
+              </div>
+              <div><label className="form-label">요약 설명</label><textarea className="form-input" rows={2} value={f.desc||''} onChange={e => setF(p => ({...p, desc:e.target.value}))} style={{ resize:'vertical', borderRadius:18 }} placeholder="카탈로그/관리자용 짧은 설명"/></div>
+              <div><label className="form-label">상품 정보</label><textarea className="form-input" rows={3} value={f.detailInfo||''} onChange={e => setF(p => ({...p, detailInfo:e.target.value}))} style={{ resize:'vertical', borderRadius:18 }}/></div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                <div><label className="form-label">배송 안내</label><textarea className="form-input" rows={3} value={f.shippingInfo||''} onChange={e => setF(p => ({...p, shippingInfo:e.target.value}))} style={{ resize:'vertical', borderRadius:18 }}/></div>
+                <div><label className="form-label">교환·반품</label><textarea className="form-input" rows={3} value={f.returnInfo||''} onChange={e => setF(p => ({...p, returnInfo:e.target.value}))} style={{ resize:'vertical', borderRadius:18 }}/></div>
               </div>
             </div>
-            <div style={{ display:'flex', gap:24, flexWrap:'wrap' }}>
-              {[{ label:'판매 활성화', key:'active' }, { label:'추천 노출', key:'featured' }].map(({label,key}) => (
-                <div key={key} style={{ display:'flex', alignItems:'center', gap:10 }}>
-                  <span style={{ fontSize:13, fontWeight:500, color:'var(--fg-2)', fontFamily:PF }}>{label}</span>
-                  <div onClick={() => setF(p => ({...p, [key]:!p[key]}))} style={{ width:44, height:24, borderRadius:999, cursor:'pointer', background: f[key] ? 'var(--accent)' : 'rgba(10,37,64,0.15)', position:'relative', transition:'background 200ms' }}>
-                    <div style={{ width:18, height:18, borderRadius:999, background:'#fff', position:'absolute', top:3, left: f[key] ? 23 : 3, transition:'left 200ms', boxShadow:'0 1px 3px rgba(0,0,0,0.2)' }}/>
+
+            <div className="glass-card" style={{ display:'flex', flexDirection:'column', gap:12, borderRadius:16 }}>
+              <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                <div style={{fontSize:15, fontWeight:800, color:'var(--fg-1)', fontFamily:'var(--font-display)'}}>옵션·재고</div>
+                <div style={{fontSize:12, color:'var(--fg-3)', fontFamily:PF}}>콤마로 색상/사이즈를 관리합니다.</div>
+              </div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                <div><label className="form-label">색상</label><input className="form-input" value={f.colorText||''} onChange={e => setF(p => ({...p, colorText:e.target.value}))} placeholder="블랙, 네이비"/></div>
+                <div><label className="form-label">사이즈</label><input className="form-input" value={f.sizeText||''} onChange={e => setF(p => ({...p, sizeText:e.target.value}))} placeholder="M, L, XL, 2XL"/></div>
+              </div>
+              {colors.length > 0 ? (
+                <div style={{display:'flex', flexDirection:'column', gap:8}}>
+                  <div style={{display:'grid', gridTemplateColumns:`120px repeat(${Math.max(sizes.length, 1)}, minmax(68px, 1fr))`, gap:8, alignItems:'center'}}>
+                    <div></div>
+                    {sizes.map(s => <div key={s} style={{fontSize:11, fontWeight:800, color:'var(--fg-3)', textAlign:'center', fontFamily:PF}}>{s}</div>)}
                   </div>
+                  {colors.map(c => (
+                    <div key={c.id} style={{display:'grid', gridTemplateColumns:`120px repeat(${Math.max(sizes.length, 1)}, minmax(68px, 1fr))`, gap:8, alignItems:'center'}}>
+                      <div style={{display:'flex', alignItems:'center', gap:7, fontSize:12, fontWeight:700, color:'var(--fg-2)', fontFamily:PF, minWidth:0}}>
+                        <span style={{width:14,height:14,borderRadius:999,background:c.value,border:'1px solid rgba(0,0,0,0.14)',flexShrink:0}}/>
+                        <span style={{overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{c.name}</span>
+                      </div>
+                      {sizes.map(s => (
+                        <input key={`${c.id}-${s}`} type="number" value={f.stockByColorSize?.[c.id]?.[s] ?? f.stock?.[s] ?? 0}
+                          onChange={e => setF(p => ({...p, stockByColorSize:{...p.stockByColorSize, [c.id]:{...(p.stockByColorSize?.[c.id]||{}), [s]:parseInt(e.target.value)||0}}}))}
+                          style={{width:'100%', textAlign:'center', padding:'8px 4px', borderRadius:9, border:'1px solid var(--border-hairline)', fontFamily:PF, fontSize:14, background:'#fff'}}/>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(86px, 1fr))', gap:10}}>
+                  {sizes.map(s => (
+                    <div key={s} style={{padding:10, border:'1px solid rgba(10,37,64,0.08)', borderRadius:12, background:'rgba(255,255,255,0.58)'}}>
+                      <div style={{fontSize:12, fontWeight:800, color:'var(--fg-1)', marginBottom:7, fontFamily:PF}}>{s}</div>
+                      <input type="number" value={f.stock?.[s]||0} onChange={e => setF(p => ({...p, stock:{...p.stock, [s]:parseInt(e.target.value)||0}}))}
+                        style={{width:'100%', textAlign:'center', padding:'8px 4px', borderRadius:9, border:'1px solid var(--border-hairline)', fontFamily:PF, fontSize:14, background:'#fff'}}/>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{display:'flex', gap:8, flexWrap:'wrap'}}>
+                {colors.map(c => <span key={c.id} style={{display:'inline-flex', alignItems:'center', gap:6, fontSize:12, color:'var(--fg-2)', fontFamily:PF, padding:'5px 9px', borderRadius:999, background:'rgba(255,255,255,0.7)'}}><span style={{width:12,height:12,borderRadius:999,background:c.value,border:'1px solid rgba(0,0,0,0.14)'}}/>{c.name}</span>)}
+                <span style={{fontSize:12, color:'var(--fg-3)', fontFamily:PF, padding:'5px 0'}}>총 재고 {totalStock}개</span>
+              </div>
+            </div>
+
+            <div className="glass-card" style={{display:'flex', justifyContent:'space-between', alignItems:'center', borderRadius:16}}>
+              <div style={{ display:'flex', gap:24, flexWrap:'wrap' }}>
+                {[{ label:'판매 활성화', key:'active' }, { label:'추천 노출', key:'featured' }].map(({label,key}) => (
+                  <div key={key} style={{ display:'flex', alignItems:'center', gap:10 }}>
+                    <span style={{ fontSize:13, fontWeight:600, color:'var(--fg-2)', fontFamily:PF }}>{label}</span>
+                    <Toggle on={!!f[key]} onChange={() => setF(p => ({...p, [key]:!p[key]}))}/>
                 </div>
               ))}
-            </div>
-            <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
+              </div>
+              <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
               <button className="btn btn-secondary" onClick={() => setEditing(null)}>취소</button>
-              <button className="btn btn-primary" onClick={() => saveProduct(f)}><Icon name="check"/> 저장</button>
+                <button className="btn btn-primary" disabled={saving} onClick={() => saveProduct(f)}><Icon name="check"/> {saving ? '저장 중' : '저장'}</button>
+              </div>
             </div>
           </div>
           {/* 미리보기 */}
           <div>
             <div style={{ fontSize:11, fontWeight:600, color:'var(--fg-3)', letterSpacing:'0.05em', textTransform:'uppercase', marginBottom:10 }}>미리보기</div>
             <div style={{ background:'rgba(255,255,255,0.78)', border:'1px solid rgba(255,255,255,0.65)', borderRadius:16, overflow:'hidden', boxShadow:'0 2px 8px rgba(10,37,64,0.06)' }}>
-              <div style={{ height:170, background:'linear-gradient(145deg,#EAF4FF,#D4E8FB)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:80 }}>{f.thumb||'📦'}</div>
+              <div style={{ height:170, background:'linear-gradient(145deg,#EAF4FF,#D4E8FB)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:80 }}>
+                {f.imageUrl ? <img src={f.imageUrl} alt={f.name} style={{maxWidth:'72%', maxHeight:'72%', objectFit:'contain'}}/> : (f.thumb||'📦')}
+              </div>
               <div style={{ padding:'12px 14px 16px' }}>
                 <div style={{ fontSize:11, color:'var(--fg-3)', fontFamily:PF, marginBottom:3 }}>{f.cat}</div>
                 <div style={{ fontSize:14, fontWeight:700, color:'var(--fg-1)', lineHeight:1.3 }}>{f.name||'상품명'}</div>
                 <div style={{ fontSize:16, fontWeight:800, color:'var(--accent)', marginTop:7 }}>{fmtPts(f.pts)}<span style={{ fontSize:11, fontWeight:500, marginLeft:2, color:'var(--fg-3)' }}>P</span></div>
                 <div style={{ fontSize:11, color:'var(--fg-4)', marginTop:4, fontFamily:PF }}>총 재고 {totalStock}개</div>
+                <div style={{ marginTop:12, paddingTop:10, borderTop:'1px solid rgba(10,37,64,0.08)' }}>
+                  {['상품 정보','배송 안내','교환·반품'].map((label, i) => <div key={label} style={{display:'flex', justifyContent:'space-between', padding:'8px 0', fontSize:12, fontWeight:700, color:'var(--fg-1)', borderBottom:i===2?'none':'1px solid rgba(10,37,64,0.06)'}}><span>{label}</span><span>⌄</span></div>)}
+                </div>
               </div>
             </div>
           </div>
@@ -531,7 +688,7 @@ function AdminProductMgmt() {
           <svg viewBox="0 0 24 24" style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)' }}><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
           <input className="form-input" style={{ paddingLeft:38 }} placeholder="상품명 검색" value={search} onChange={e => setSearch(e.target.value)}/>
         </div>
-        <button className="btn btn-primary" onClick={() => setEditing({ id:Date.now(), name:'', cat:'상의', pts:0, thumb:'📦', sizes:['S','M','L','XL','2XL'], stock:{S:0,M:0,L:0,XL:0,'2XL':0}, tag:'', active:true, featured:false, desc:'' })}>
+        <button className="btn btn-primary" onClick={() => setEditing(editProduct({ id:Date.now(), name:'', cat:'상의', pts:0, thumb:'📦', imageUrl:'', colors:[WORKWEAR_COLORS.black], sizes:['S','M','L','XL','2XL'], stock:{S:0,M:0,L:0,XL:0,'2XL':0}, tag:'', active:true, featured:false, desc:'', detailInfo:DEFAULT_DETAIL, shippingInfo:DEFAULT_SHIPPING, returnInfo:DEFAULT_RETURN }))}>
           <Icon name="plus"/> 상품 추가
         </button>
       </div>
@@ -545,7 +702,7 @@ function AdminProductMgmt() {
                 <tr key={p.id}>
                   <td>
                     <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-                      <div style={{ width:40, height:40, borderRadius:10, background:'linear-gradient(145deg,#EAF4FF,#D4E8FB)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20, flexShrink:0 }}>{p.thumb}</div>
+                      <div style={{ width:40, height:40, borderRadius:10, background:'linear-gradient(145deg,#EAF4FF,#D4E8FB)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20, flexShrink:0 }}>{p.imageUrl ? <img src={p.imageUrl} alt={p.name} style={{maxWidth:'74%', maxHeight:'74%', objectFit:'contain'}}/> : p.thumb}</div>
                       <div>
                         <div style={{ fontWeight:600, fontSize:13 }}>{p.name}</div>
                         {p.tag && <span className={`chip ${p.tag==='인기'?'chip-info':'chip-warn'}`} style={{ marginTop:2 }}>{p.tag}</span>}
@@ -556,7 +713,7 @@ function AdminProductMgmt() {
                   <td style={{ fontFamily:'var(--font-display)', fontWeight:700, color:'var(--accent)', fontSize:14 }}>{fmtPts(p.pts)}P</td>
                   <td style={{ fontWeight:600, color: total===0?'var(--err)':total<=5?'var(--warn)':'var(--fg-1)' }}>{total}</td>
                   <td><Toggle on={p.active} onChange={() => toggleActive(p.id)}/></td>
-                  <td style={{ textAlign:'center' }}><button className="btn btn-secondary btn-sm" onClick={() => setEditing({...p})}><Icon name="edit" size={13}/> 수정</button></td>
+                  <td style={{ textAlign:'center' }}><button className="btn btn-secondary btn-sm" onClick={() => setEditing(editProduct(p))}><Icon name="edit" size={13}/> 수정</button></td>
                 </tr>
               );
             })}
