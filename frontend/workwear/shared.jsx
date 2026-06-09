@@ -1,7 +1,7 @@
 /* shared.jsx — 공통 컴포넌트, 목데이터, 아이콘 */
 
 /* ---- Mock Data ---- */
-const EMPLOYEE = { name: '김민준', dept: '생산 1팀', points: 15000, used: 8500, avatar: '김' };
+const EMPLOYEE = { name: '김태수', dept: 'WindTree', points: 0, used: 0, avatar: '김' };
 
 const WORKWEAR_COLORS = {
   navy:         { id:'navy',         name:'네이비',        value:'#1F3245' },
@@ -227,10 +227,15 @@ const WW = {
     window._store.employees = (users || []).map((u) => ({
       id: u.id, name: u.full_name || u.email, dept: '-', position: u.role, pts: Number(u.point_balance || 0), total_used: 0, joinDate: String(u.created_at || '').slice(0, 10),
     }));
-    EMPLOYEE.points = Number(myPoints?.balance || EMPLOYEE.points);
+    EMPLOYEE.points = Number(myPoints?.balance ?? EMPLOYEE.points);
+    if (myPoints?.full_name) {
+      EMPLOYEE.name = myPoints.full_name;
+      EMPLOYEE.avatar = myPoints.full_name.charAt(0);
+    }
+    if (myPoints?.department) EMPLOYEE.dept = myPoints.department;
     // 프로필 직접 조회 (Worker 경유 없이 Supabase 클라이언트로)
     const { data: profileRow } = await WW_SUPABASE.from('profiles')
-      .select('full_name, departments(name)')
+      .select('full_name, departments!fk_department(name)')
       .eq('id', user.id)
       .single();
     if (profileRow?.full_name) {
