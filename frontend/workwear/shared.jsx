@@ -3,19 +3,54 @@
 /* ---- Mock Data ---- */
 const EMPLOYEE = { name: '김민준', dept: '생산 1팀', points: 15000, used: 8500, avatar: '김' };
 
+const WORKWEAR_COLORS = {
+  navy: { id:'navy', name:'네이비', value:'#1F3245' },
+  charcoal: { id:'charcoal', name:'차콜', value:'#3D4147' },
+  black: { id:'black', name:'블랙', value:'#111111' },
+  gray: { id:'gray', name:'그레이', value:'#8A8F98' },
+  beige: { id:'beige', name:'베이지', value:'#C8B89A' },
+  khaki: { id:'khaki', name:'카키', value:'#68745E' },
+  orange: { id:'orange', name:'오렌지', value:'#F47B20' },
+  yellow: { id:'yellow', name:'형광 옐로우', value:'#D7F23A' },
+  blue: { id:'blue', name:'블루', value:'#2F80ED' },
+  white: { id:'white', name:'화이트', value:'#F8F8F4' },
+};
+
+function resolveWorkwearColor(color) {
+  const raw = String(color || '').trim();
+  if (/^#[0-9a-f]{6}$/i.test(raw)) {
+    return { id: raw.slice(1).toLowerCase(), name: raw, value: raw };
+  }
+  const key = raw.toLowerCase();
+  const aliases = {
+    네이비:'navy', navy:'navy',
+    차콜:'charcoal', charcoal:'charcoal',
+    블랙:'black', black:'black',
+    그레이:'gray', gray:'gray', grey:'gray',
+    베이지:'beige', beige:'beige',
+    카키:'khaki', khaki:'khaki',
+    오렌지:'orange', orange:'orange',
+    형광옐로우:'yellow', '형광 옐로우':'yellow', 옐로우:'yellow', yellow:'yellow',
+    블루:'blue', blue:'blue',
+    화이트:'white', white:'white',
+  };
+  const id = aliases[raw] || aliases[key] || key.replace(/\s+/g, '-') || 'default';
+  return WORKWEAR_COLORS[id] || { id, name: raw || '기본', value:'#8A8F98' };
+}
+
 const PRODUCTS = [
-  { id:1, name:'방한 작업복 상의', cat:'상의', pts:4500, thumb:'🧥', sizes:['S','M','L','XL','2XL'], stock:{S:10,M:15,L:8,XL:3,'2XL':0}, tag:'인기' },
-  { id:2, name:'방한 작업복 하의', cat:'하의', pts:3800, thumb:'👖', sizes:['S','M','L','XL','2XL'], stock:{S:5,M:12,L:10,XL:6,'2XL':2} },
-  { id:3, name:'여름 작업복 상의', cat:'상의', pts:2800, thumb:'👕', sizes:['S','M','L','XL','2XL'], stock:{S:20,M:25,L:18,XL:10,'2XL':5} },
-  { id:4, name:'여름 작업복 하의', cat:'하의', pts:2500, thumb:'🩳', sizes:['S','M','L','XL','2XL'], stock:{S:15,M:20,L:14,XL:8,'2XL':3} },
-  { id:5, name:'안전화 (경량형)', cat:'신발', pts:6800, thumb:'👟', sizes:['250','260','270','280','290'], stock:{'250':4,'260':8,'270':10,'280':5,'290':2} },
-  { id:6, name:'안전모 (ABS)', cat:'보호구', pts:3200, thumb:'⛑️', sizes:['FREE'], stock:{FREE:30}, tag:'재고부족' },
-  { id:7, name:'방진 마스크 (10개입)', cat:'보호구', pts:1500, thumb:'😷', sizes:['FREE'], stock:{FREE:50} },
-  { id:8, name:'내열 안전장갑', cat:'장갑', pts:1200, thumb:'🧤', sizes:['S','M','L'], stock:{S:20,M:30,L:15} },
-  { id:9, name:'안전 조끼 (형광)', cat:'안전', pts:2200, thumb:'🦺', sizes:['FREE'], stock:{FREE:25} },
-  { id:10, name:'방수 우비 (투피스)', cat:'우천용', pts:3500, thumb:'🌧️', sizes:['M','L','XL','2XL'], stock:{M:8,L:12,XL:6,'2XL':2} },
-  { id:11, name:'내한 방한복', cat:'동계용', pts:8500, thumb:'🧣', sizes:['M','L','XL','2XL'], stock:{M:5,L:7,XL:4,'2XL':1}, tag:'인기' },
-  { id:12, name:'안전화 (중보호)', cat:'신발', pts:8200, thumb:'🥾', sizes:['250','260','270','280','290'], stock:{'250':3,'260':6,'270':8,'280':4,'290':1} },
+  { id:1, name:'방한 작업복 상의', cat:'상의', pts:4500, thumb:'🧥', colors:[WORKWEAR_COLORS.navy, WORKWEAR_COLORS.charcoal, WORKWEAR_COLORS.black], sizes:['S','M','L','XL','2XL'], stock:{S:10,M:15,L:8,XL:3,'2XL':0}, tag:'인기' },
+  { id:2, name:'방한 작업복 하의', cat:'하의', pts:3800, thumb:'👖', colors:[WORKWEAR_COLORS.navy, WORKWEAR_COLORS.charcoal, WORKWEAR_COLORS.black], sizes:['S','M','L','XL','2XL'], stock:{S:5,M:12,L:10,XL:6,'2XL':2} },
+  { id:3, name:'여름 작업복 상의', cat:'상의', pts:2800, thumb:'👕', colors:[WORKWEAR_COLORS.blue, WORKWEAR_COLORS.gray, WORKWEAR_COLORS.white], sizes:['S','M','L','XL','2XL'], stock:{S:20,M:25,L:18,XL:10,'2XL':5} },
+  { id:4, name:'여름 작업복 하의', cat:'하의', pts:2500, thumb:'🩳', colors:[WORKWEAR_COLORS.navy, WORKWEAR_COLORS.gray, WORKWEAR_COLORS.beige], sizes:['S','M','L','XL','2XL'], stock:{S:15,M:20,L:14,XL:8,'2XL':3} },
+  { id:5, name:'안전화 (경량형)', cat:'신발', pts:6800, thumb:'👟', colors:[WORKWEAR_COLORS.black, WORKWEAR_COLORS.gray], sizes:['250','260','270','280','290'], stock:{'250':4,'260':8,'270':10,'280':5,'290':2} },
+  { id:6, name:'안전모 (ABS)', cat:'보호구', pts:3200, thumb:'⛑️', colors:[WORKWEAR_COLORS.white, WORKWEAR_COLORS.yellow], sizes:['FREE'], stock:{FREE:30}, tag:'재고부족' },
+  { id:7, name:'방진 마스크 (10개입)', cat:'보호구', pts:1500, thumb:'😷', colors:[WORKWEAR_COLORS.white], sizes:['FREE'], stock:{FREE:50} },
+  { id:8, name:'내열 안전장갑', cat:'장갑', pts:1200, thumb:'🧤', colors:[WORKWEAR_COLORS.gray, WORKWEAR_COLORS.orange], sizes:['S','M','L'], stock:{S:20,M:30,L:15} },
+  { id:9, name:'안전 조끼 (형광)', cat:'안전', pts:2200, thumb:'🦺', colors:[WORKWEAR_COLORS.yellow, WORKWEAR_COLORS.orange], sizes:['FREE'], stock:{FREE:25} },
+  { id:10, name:'방수 우비 (투피스)', cat:'우천용', pts:3500, thumb:'🌧️', colors:[WORKWEAR_COLORS.navy, WORKWEAR_COLORS.yellow], sizes:['M','L','XL','2XL'], stock:{M:8,L:12,XL:6,'2XL':2} },
+  { id:11, name:'내한 방한복', cat:'동계용', pts:8500, thumb:'🧣', colors:[WORKWEAR_COLORS.charcoal, WORKWEAR_COLORS.khaki, WORKWEAR_COLORS.black], sizes:['M','L','XL','2XL'], stock:{M:5,L:7,XL:4,'2XL':1}, tag:'인기' },
+  { id:12, name:'안전화 (중보호)', cat:'신발', pts:8200, thumb:'🥾', colors:[WORKWEAR_COLORS.black, WORKWEAR_COLORS.khaki], sizes:['250','260','270','280','290'], stock:{'250':3,'260':6,'270':8,'280':4,'290':1} },
 ];
 
 const ORDERS = [
@@ -115,14 +150,33 @@ const WW = {
     const detailedProducts = await Promise.all((products || []).map(async (p) => {
       const detail = await wwApi(`/products/${p.id}`).catch(() => null);
       const variants = detail?.variants || [];
-      const sizes = variants.length ? variants.map((v) => String(v.size)) : ['FREE'];
+      const sizes = variants.length ? [...new Set(variants.map((v) => String(v.size)))] : ['FREE'];
+      const colorNames = [...new Set(variants.map((v) => v.color).filter(Boolean))];
+      const colors = colorNames.map(resolveWorkwearColor);
       const stock = variants.length
-        ? variants.reduce((acc, v) => ({ ...acc, [String(v.size)]: Number(v.stock_qty || 0) }), {})
+        ? variants.reduce((acc, v) => {
+            const size = String(v.size);
+            acc[size] = (acc[size] || 0) + Number(v.stock_qty || 0);
+            return acc;
+          }, {})
         : { FREE: 0 };
       const variantBySize = variants.reduce((acc, v) => ({ ...acc, [String(v.size)]: v.id }), {});
+      const stockByColorSize = variants.reduce((acc, v) => {
+        const color = resolveWorkwearColor(v.color);
+        const size = String(v.size);
+        acc[color.id] = acc[color.id] || {};
+        acc[color.id][size] = Number(v.stock_qty || 0);
+        return acc;
+      }, {});
+      const variantByColorSize = variants.reduce((acc, v) => {
+        const color = resolveWorkwearColor(v.color);
+        acc[color.id] = acc[color.id] || {};
+        acc[color.id][String(v.size)] = v.id;
+        return acc;
+      }, {});
       return {
         id: p.id, name: p.name, cat: p.category || '기타', pts: Number(p.point_price || 0),
-        thumb: '📦', sizes, stock, variantBySize, tag: '', active: !!p.is_active, featured: false, desc: p.description || '',
+        thumb: '📦', colors, sizes, stock, stockByColorSize, variantBySize, variantByColorSize, tag: '', active: !!p.is_active, featured: false, desc: p.description || '',
       };
     }));
     window._store.products = detailedProducts;

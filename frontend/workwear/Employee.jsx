@@ -44,16 +44,25 @@ function EmployeeHome({ setScreen, setSelectedProduct, setCart }) {
 
   function addToCart(product, e) {
     e && e.stopPropagation();
-    const firstSize = product.sizes.find(s => product.stock[s] > 0);
+    const firstColor = product.colors?.[0] || null;
+    const stockBySize = firstColor && product.stockByColorSize ? product.stockByColorSize[firstColor.id] || {} : product.stock;
+    const firstSize = product.sizes.find(s => (stockBySize[s] || 0) > 0);
     if (!firstSize) return;
     setCart(prev => {
-      const idx = prev.findIndex(i => i.id === product.id && i.size === firstSize);
+      const colorId = firstColor?.id || 'default';
+      const idx = prev.findIndex(i => i.id === product.id && i.size === firstSize && (i.color?.id || 'default') === colorId);
       if (idx >= 0) {
         const next = [...prev];
         next[idx] = { ...next[idx], qty: (next[idx].qty || 1) + 1 };
         return next;
       }
-      return [...prev, { ...product, size: firstSize, variant_id: product.variantBySize?.[firstSize] || null, qty: 1 }];
+      return [...prev, {
+        ...product,
+        color: firstColor,
+        size: firstSize,
+        variant_id: firstColor ? product.variantByColorSize?.[firstColor.id]?.[firstSize] || null : product.variantBySize?.[firstSize] || null,
+        qty: 1,
+      }];
     });
   }
 
@@ -278,6 +287,20 @@ function EmployeeCatalog({ setScreen, setSelectedProduct }) {
               <div className="nike-meta">
                 <div className="nike-cat">{p.cat}</div>
                 <div className="nike-name">{p.name}</div>
+                {p.colors?.length > 0 && (
+                  <div style={{display:'flex', alignItems:'center', gap:6, marginTop:8}}>
+                    {p.colors.slice(0,4).map(c => (
+                      <span key={c.id} title={c.name} style={{
+                        width:14, height:14, borderRadius:999,
+                        background:c.value,
+                        border:c.value==='#F8F8F4' ? '1px solid #d8d8d8' : '1px solid rgba(0,0,0,0.16)',
+                      }} />
+                    ))}
+                    {p.colors.length > 4 && (
+                      <span style={{fontSize:10, color:'#757575', fontFamily:'var(--font-sans)'}}>+{p.colors.length - 4}</span>
+                    )}
+                  </div>
+                )}
                 <div className="nike-price">{fmtPts(p.pts)} P</div>
               </div>
             </div>
@@ -291,6 +314,7 @@ function EmployeeCatalog({ setScreen, setSelectedProduct }) {
 /* ---- 상품 상세 화면 (나이키 스타일) ---- */
 function ProductDetail({ product, setScreen, setSelectedProduct, cart, setCart, openCart }) {
   const store = useStore();
+  const [color, setColor] = useEmp(product?.colors?.[0] || null);
   const [size, setSize] = useEmp(null);
   const [added, setAdded] = useEmp(false);
   const [activeThumb, setActiveThumb] = useEmp(0);
@@ -298,6 +322,11 @@ function ProductDetail({ product, setScreen, setSelectedProduct, cart, setCart, 
   if (!product) return null;
 
   const NKF = "'Pretendard Variable', Pretendard, -apple-system, 'Apple SD Gothic Neo', sans-serif";
+  const colors = product.colors || [];
+  const needsColor = colors.length > 0;
+  const selectedColor = needsColor ? color : null;
+  const selectedStock = selectedColor && product.stockByColorSize ? product.stockByColorSize[selectedColor.id] || {} : product.stock;
+  const canAddToCart = (!needsColor || selectedColor) && !!size;
 
   // 더미 썸네일 (동일 이모지 각도 변형 표현)
   const thumbs = [
@@ -310,15 +339,22 @@ function ProductDetail({ product, setScreen, setSelectedProduct, cart, setCart, 
   const recommendations = store.products.filter(p => p.id !== product.id).slice(0, 3);
 
   function addToCart() {
-    if (!size) return;
+    if (!canAddToCart) return;
     setCart(prev => {
-      const idx = prev.findIndex(i=>i.id===product.id && i.size===size);
+      const colorId = selectedColor?.id || 'default';
+      const idx = prev.findIndex(i=>i.id===product.id && i.size===size && (i.color?.id || 'default')===colorId);
       if (idx >= 0) {
         const next = [...prev];
         next[idx] = { ...next[idx], qty: (next[idx].qty || 1) + 1 };
         return next;
       }
-      return [...prev, { ...product, size, variant_id: product.variantBySize?.[size] || null, qty: 1 }];
+      return [...prev, {
+        ...product,
+        color: selectedColor,
+        size,
+        variant_id: selectedColor ? product.variantByColorSize?.[selectedColor.id]?.[size] || null : product.variantBySize?.[size] || null,
+        qty: 1,
+      }];
     });
     setAdded(true);
     setTimeout(()=>setAdded(false), 1800);
@@ -379,6 +415,57 @@ function ProductDetail({ product, setScreen, setSelectedProduct, cart, setCart, 
             {fmtPts(product.pts)}P
           </div>
 
+          {/* 색상 선택 */}
+          {needsColor && (
+            <>
+              <div style={{marginBottom:8, display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                <span style={{fontSize:13, fontWeight:600, color:'#111', fontFamily:NKF}}>색상 선택</span>
+                {selectedColor && <span style={{fontSize:12, color:'#757575', fontFamily:NKF}}>{selectedColor.name}</span>}
+              </div>
+              {!selectedColor && <div style={{fontSize:12, color:'#fa3c00', marginBottom:10, fontFamily:NKF}}>색상을 선택해주세요</div>}
+              <div style={{display:'flex', flexDirection:'column', gap:8, marginBottom:22}}>
+                {colors.map(c => {
+                  const isSelected = selectedColor?.id === c.id;
+                  return (
+                    <button key={c.id} onClick={()=>{setColor(c); setSize(null);}} style={{
+                      width:'100%',
+                      minHeight:48,
+                      padding:'10px 12px',
+                      border: isSelected ? '2px solid #111' : '1px solid #ddd',
+                      borderRadius:4,
+                      background:'#fff',
+                      color:'#111',
+                      cursor:'pointer',
+                      display:'flex',
+                      alignItems:'center',
+                      justifyContent:'space-between',
+                      fontSize:13,
+                      fontWeight:isSelected ? 700 : 500,
+                      fontFamily:NKF,
+                      transition:'border-color 120ms',
+                    }}>
+                      <span style={{display:'flex', alignItems:'center', gap:10}}>
+                        <span style={{
+                          width:22,
+                          height:22,
+                          borderRadius:999,
+                          background:c.value,
+                          border:c.value==='#F8F8F4' ? '1px solid #d8d8d8' : '1px solid rgba(0,0,0,0.18)',
+                          boxShadow:isSelected ? '0 0 0 3px #fff, 0 0 0 4px #111' : 'none',
+                          flexShrink:0,
+                        }} />
+                        {c.name}
+                      </span>
+                      {isSelected && (
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" width="16" height="16"><polyline points="20 6 9 17 4 12"/></svg>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
           {/* 사이즈 선택 */}
           <div style={{marginBottom:8, display:'flex', justifyContent:'space-between', alignItems:'center'}}>
             <span style={{fontSize:13, fontWeight:600, color:'#111', fontFamily:NKF}}>사이즈 선택</span>
@@ -387,7 +474,8 @@ function ProductDetail({ product, setScreen, setSelectedProduct, cart, setCart, 
           {!size && <div style={{fontSize:12, color:'#fa3c00', marginBottom:10, fontFamily:NKF}}>사이즈를 선택해주세요</div>}
           <div style={{display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:8, marginBottom:20}}>
             {product.sizes.map(s => {
-              const inStock = product.stock[s] > 0;
+              const stockQty = selectedStock[s] || 0;
+              const inStock = stockQty > 0;
               const isSelected = size === s;
               return (
                 <button key={s} onClick={()=>inStock&&setSize(s)} style={{
@@ -403,8 +491,8 @@ function ProductDetail({ product, setScreen, setSelectedProduct, cart, setCart, 
                   position:'relative',
                 }}>
                   {s}
-                  {inStock && product.stock[s]<=3 && !isSelected && (
-                    <span style={{position:'absolute',top:4,right:6,fontSize:9,color:'#fa3c00',fontWeight:700}}>잔{product.stock[s]}</span>
+                  {inStock && stockQty<=3 && !isSelected && (
+                    <span style={{position:'absolute',top:4,right:6,fontSize:9,color:'#fa3c00',fontWeight:700}}>잔{stockQty}</span>
                   )}
                 </button>
               );
@@ -412,18 +500,18 @@ function ProductDetail({ product, setScreen, setSelectedProduct, cart, setCart, 
           </div>
 
           {/* 재고 안내 */}
-          {size && product.stock[size] <= 3 && product.stock[size] > 0 && (
+          {size && selectedStock[size] <= 3 && selectedStock[size] > 0 && (
             <div style={{fontSize:12, color:'#fa3c00', marginBottom:12, fontFamily:NKF, fontWeight:500}}>
-              이 사이즈는 {product.stock[size]}개만 남았어요.
+              이 조합은 {selectedStock[size]}개만 남았어요.
             </div>
           )}
 
           {/* 장바구니 CTA */}
-          <button onClick={addToCart} disabled={!size} style={{
+          <button onClick={addToCart} disabled={!canAddToCart} style={{
             width:'100%', height:56, borderRadius:28,
-            background: size ? '#111' : '#e5e5e5',
-            color: size ? '#fff' : '#999',
-            border:'none', cursor: size ? 'pointer' : 'not-allowed',
+            background: canAddToCart ? '#111' : '#e5e5e5',
+            color: canAddToCart ? '#fff' : '#999',
+            border:'none', cursor: canAddToCart ? 'pointer' : 'not-allowed',
             fontSize:15, fontWeight:700, fontFamily:NKF,
             letterSpacing:'-0.01em', transition:'background 160ms',
             display:'flex', alignItems:'center', justifyContent:'center', gap:8,
@@ -546,7 +634,7 @@ function EmployeeCart({ cart, setCart, setScreen }) {
               <div className="cart-thumb">{item.thumb}</div>
               <div>
                 <div className="cart-item-name">{item.name}</div>
-                <div className="cart-item-meta">사이즈 {item.size} · {item.cat}</div>
+                <div className="cart-item-meta">{item.color ? `${item.color.name} · ` : ''}사이즈 {item.size} · {item.cat}</div>
               </div>
               <div style={{textAlign:'right'}}>
                 <div className="cart-item-pts">{fmtPts(item.pts)}P</div>
@@ -759,7 +847,19 @@ function CartDrawer({ isOpen, onClose, cart, setCart }) {
                   {/* 정보 + 수량 */}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--fg-1)', lineHeight: 1.3, letterSpacing: '-0.01em' }}>{item.name}</div>
-                    <div style={{ fontSize: 12, color: 'var(--fg-3)', marginTop: 2 }}>사이즈 {item.size}</div>
+                    <div style={{ fontSize: 12, color: 'var(--fg-3)', marginTop: 2, display:'flex', alignItems:'center', gap:6 }}>
+                      {item.color && (
+                        <span style={{
+                          width:12,
+                          height:12,
+                          borderRadius:999,
+                          background:item.color.value,
+                          border:item.color.value==='#F8F8F4' ? '1px solid #d8d8d8' : '1px solid rgba(0,0,0,0.16)',
+                          flexShrink:0,
+                        }} />
+                      )}
+                      <span>{item.color ? `${item.color.name} · ` : ''}사이즈 {item.size}</span>
+                    </div>
                     {/* 수량 조절 */}
                     <div style={{ display: 'flex', alignItems: 'center', marginTop: 10 }}>
                       <button onClick={() => updateQty(idx, -1)} style={{ ...qBtn(), borderRadius: '7px 0 0 7px', borderRight: 'none' }}>−</button>
