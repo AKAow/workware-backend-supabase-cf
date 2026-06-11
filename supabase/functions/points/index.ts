@@ -78,7 +78,8 @@ async function myPoints({ supabase, userId }: Ctx) {
     .limit(100);
 
   if (txErr) return error(500, 'INTERNAL_ERROR', txErr.message);
-  return json({ balance: profile.point_balance, transactions: txs ?? [] });
+  const deptName = (profile as any).departments?.name ?? null;
+  return json({ balance: profile.point_balance, full_name: profile.full_name ?? null, department: deptName, role: profile.role, transactions: txs ?? [] });
 }
 
 async function userPoints({ supabase, userId }: Ctx, targetId: string) {

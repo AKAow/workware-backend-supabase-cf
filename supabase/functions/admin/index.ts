@@ -82,7 +82,10 @@ async function updateDepartment({ req, supabase }: Ctx, departmentId: string) {
 async function orders({ req, supabase }: Ctx) {
   const url = new URL(req.url);
   const status = url.searchParams.get('status');
-  let q = supabase.from('orders').select('*, profiles!inner(id,email,full_name,department_id)').order('created_at', { ascending: false });
+  let q = supabase
+    .from('orders')
+    .select('*, profiles!orders_user_id_fkey(id,email,full_name,department_id)')
+    .order('created_at', { ascending: false });
   if (status) q = q.eq('status', status);
   const { data, error: e } = await q;
   if (e) return error(500, 'INTERNAL_ERROR', e.message);

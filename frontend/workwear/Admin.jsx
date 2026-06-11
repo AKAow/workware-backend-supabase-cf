@@ -433,14 +433,187 @@ function AdminBannerMgmt() {
 function AdminProductMgmt() {
   const store = useStore();
   const [editing, setEditing] = React.useState(null);
+  const [editTab, setEditTab] = React.useState('basic');
   const [search, setSearch] = React.useState('');
+  const [saving, setSaving] = React.useState(false);
+  const [newSize, setNewSize] = React.useState('');
   const PF = "var(--font-sans)";
   const CATS = ['상의','하의','신발','보호구','장갑','안전','동계용','우천용'];
+  const DEFAULT_DETAIL = '100% 폴리에스터 소재, 현장 작업에 최적화된 내구성 원단. 반사 테이프 적용으로 야간 안전성 확보.';
+  const DEFAULT_SHIPPING = '승인 후 2~3 영업일 내 발송. 사내 물류팀을 통해 근무지로 배송됩니다.';
+  const DEFAULT_RETURN = '수령 후 7일 이내 미착용 상태에서 교환 가능. 담당자에게 문의 후 반품 절차 안내 받으세요.';
+  const SIZE_PRESETS = {
+    '상의':   [['일반', ['S','M','L','XL','2XL']], ['확장', ['XS','S','M','L','XL','2XL','3XL']]],
+    '하의':   [['일반', ['S','M','L','XL','2XL']], ['확장', ['XS','S','M','L','XL','2XL','3XL']]],
+    '신발':   [['표준mm', ['250','260','270','280','290']], ['확장mm', ['240','250','260','270','280','290','300']]],
+    '보호구': [['일반', ['S','M','L','XL']], ['FREE', ['FREE']]],
+    '장갑':   [['일반', ['S','M','L']], ['FREE', ['FREE']]],
+    '안전':   [['FREE', ['FREE']], ['일반', ['S','M','L','XL']]],
+    '동계용': [['일반', ['S','M','L','XL','2XL']]],
+    '우천용': [['일반', ['M','L','XL','2XL']]],
+  };
+  const isUuid = id => /^[0-9a-fA-F-]{36}$/.test(String(id || ''));
+  const splitTokens = value => String(value || '').split(',').map(s => s.trim()).filter(Boolean);
+  const uniqueTokens = values => [...new Set((values || []).map(v => String(v || '').trim()).filter(Boolean))];
+  const normalizeSizes = value => uniqueTokens(Array.isArray(value) ? value : splitTokens(value));
+  const uniqueColors = value => {
+    const seen = new Set();
+    return splitTokens(value).map(resolveWorkwearColor).filter(c => {
+      if (seen.has(c.id)) return false;
+      seen.add(c.id);
+      return true;
+    });
+  };
+  const stockStatusOf = qty => {
+    const value = Number(qty || 0);
+    if (value <= 0) return { label:'품절', color:'var(--err)', bg:'rgba(226, 55, 68, 0.09)', border:'rgba(226, 55, 68, 0.24)' };
+    if (value <= 5) return { label:'부족', color:'var(--warn)', bg:'rgba(232, 161, 60, 0.12)', border:'rgba(232, 161, 60, 0.28)' };
+    return { label:'판매중', color:'var(--ok)', bg:'rgba(53, 170, 116, 0.10)', border:'rgba(53, 170, 116, 0.24)' };
+  };
+  const StockPill = ({ qty }) => {
+    const st = stockStatusOf(qty);
+    return <span style={{ display:'inline-flex', alignItems:'center', justifyContent:'center', minWidth:42, height:22, padding:'0 8px', borderRadius:999, fontSize:11, fontWeight:800, color:st.color, background:st.bg, border:`1px solid ${st.border}`, fontFamily:PF }}>{st.label}</span>;
+  };
+  const setEditingSizes = nextSizes => setEditing(prev => {
+    if (!prev) return prev;
+    const sizes = normalizeSizes(nextSizes);
+    const colors = uniqueColors(prev.colorText || '');
+    const hasColorStock = Object.keys(prev.stockByColorSize || {}).length > 0;
+    const stock = sizes.reduce((acc, s) => ({ ...acc, [s]: Number(prev.stock?.[s] || 0) }), {});
+    const stockByColorSize = colors.reduce((acc, c) => ({
+      ...acc,
+      [c.id]: sizes.reduce((row, s) => ({
+        ...row,
+        [s]: Number(prev.stockByColorSize?.[c.id]?.[s] ?? (hasColorStock ? 0 : prev.stock?.[s] ?? 0)),
+      }), {}),
+    }), {});
+    return { ...prev, sizes, sizeText: sizes.join(', '), stock, stockByColorSize };
+  });
+  const editProduct = p => ({
+    ...p,
+    imageUrl: p.imageUrl || '',
+    extraImages: p.extraImages || [],
+    stockByColorSize: p.stockByColorSize || (p.colors || []).reduce((acc, color) => ({
+      ...acc,
+      [color.id]: (p.sizes || []).reduce((row, size) => ({ ...row, [size]: Number(p.stock?.[size] || 0) }), {}),
+    }), {}),
+    detailInfo: p.detailInfo || p.desc || DEFAULT_DETAIL,
+    shippingInfo: p.shippingInfo || DEFAULT_SHIPPING,
+    returnInfo: p.returnInfo || DEFAULT_RETURN,
+    colorText: (p.colors || []).map(c => c.name).join(', '),
+    sizeText: (p.sizes || []).join(', '),
+  });
 
-  function toggleActive(id) { store.products = store.products.map(p => p.id===id ? {...p, active:!p.active} : p); store.pub(); }
-  function saveProduct(prod) {
-    store.products = store.products.find(p => p.id===prod.id) ? store.products.map(p => p.id===prod.id ? prod : p) : [...store.products, prod];
-    store.pub(); setEditing(null);
+  async function deleteProduct(id) {
+    if (!window.confirm('상품을 삭제하시겠습니까? 되돌릴 수 없습니다.')) return;
+    if (isUuid(id) && WW?.deleteProduct) {
+      try { await WW.deleteProduct(id); await WW.bootstrap(); }
+      catch (e) { alert(e.message || '삭제 실패'); }
+    } else {
+      store.products = store.products.filter(p => p.id !== id);
+      store.pub();
+    }
+  }
+
+  async function toggleActive(id) {
+    const target = store.products.find(p => p.id === id);
+    const nextActive = !target?.active;
+    store.products = store.products.map(p => p.id===id ? {...p, active:nextActive} : p);
+    store.pub();
+    if (isUuid(id) && WW?.updateProduct) {
+      try { await WW.updateProduct(id, { is_active: nextActive }); }
+      catch (e) { alert(e.message || '판매 상태 저장에 실패했습니다.'); }
+    }
+  }
+
+  async function saveProduct(prod) {
+    setSaving(true);
+    try {
+      const colors = uniqueColors(prod.colorText);
+      const sizes = normalizeSizes(prod.sizeText);
+      if (sizes.length === 0) throw new Error('사이즈를 1개 이상 추가하세요.');
+      const hasColorStock = Object.keys(prod.stockByColorSize || {}).length > 0;
+      const normalized = {
+        ...prod,
+        colors,
+        sizes,
+        stockByColorSize: colors.reduce((acc, color) => ({
+          ...acc,
+          [color.id]: sizes.reduce((row, s) => ({
+            ...row,
+            [s]: Number(prod.stockByColorSize?.[color.id]?.[s] ?? (hasColorStock ? 0 : prod.stock?.[s] ?? 0)),
+          }), {}),
+        }), {}),
+        stock: sizes.reduce((acc, s) => ({
+          ...acc,
+          [s]: colors.length
+            ? colors.reduce((sum, color) => sum + Number(prod.stockByColorSize?.[color.id]?.[s] ?? (hasColorStock ? 0 : prod.stock?.[s] ?? 0)), 0)
+            : Number(prod.stock?.[s] || 0),
+        }), {}),
+        detailInfo: prod.detailInfo || prod.desc || DEFAULT_DETAIL,
+        shippingInfo: prod.shippingInfo || DEFAULT_SHIPPING,
+        returnInfo: prod.returnInfo || DEFAULT_RETURN,
+      };
+      const payload = {
+        name: normalized.name,
+        category: normalized.cat,
+        point_price: Number(normalized.pts || 0),
+        image_url: normalized.imageUrl || null,
+        description: stringifyProductMeta(normalized),
+        is_active: !!normalized.active,
+      };
+      let saved = normalized;
+      if (WW?.client && WW?.updateProduct) {
+        const productRow = isUuid(normalized.id)
+          ? await WW.updateProduct(normalized.id, payload)
+          : await WW.createProduct(payload);
+        saved = { ...normalized, id: productRow.id };
+        const activeVariantIds = new Set();
+        for (const size of sizes) {
+          const qty = Number(normalized.stock[size] || 0);
+          if (colors.length) {
+            for (const color of colors) {
+              const colorQty = Number(normalized.stockByColorSize?.[color.id]?.[size] || 0);
+              const variantId = normalized.variantByColorSize?.[color.id]?.[size];
+              if (variantId) {
+                activeVariantIds.add(variantId);
+                await WW.updateVariantStock(variantId, colorQty);
+              } else {
+                const created = await WW.createVariant(productRow.id, { size, color: color.name, stock_qty: colorQty });
+                if (created?.id) activeVariantIds.add(created.id);
+              }
+            }
+          } else {
+            const variantId = normalized.variantBySize?.[size];
+            if (variantId) {
+              activeVariantIds.add(variantId);
+              await WW.updateVariantStock(variantId, qty);
+            } else {
+              const created = await WW.createVariant(productRow.id, { size, color: null, stock_qty: qty });
+              if (created?.id) activeVariantIds.add(created.id);
+            }
+          }
+        }
+        const knownVariantIds = new Set([
+          ...Object.values(normalized.variantBySize || {}),
+          ...Object.values(normalized.variantByColorSize || {}).flatMap(row => Object.values(row || {})),
+        ].filter(Boolean));
+        if (WW.deleteVariant) {
+          for (const variantId of knownVariantIds) {
+            if (!activeVariantIds.has(variantId)) await WW.deleteVariant(variantId);
+          }
+        }
+        await WW.bootstrap();
+      } else {
+        store.products = store.products.find(p => p.id===saved.id) ? store.products.map(p => p.id===saved.id ? saved : p) : [...store.products, saved];
+        store.pub();
+      }
+      setEditing(null);
+    } catch (e) {
+      alert(e.message || '상품 저장에 실패했습니다.');
+    } finally {
+      setSaving(false);
+    }
   }
 
   const Toggle = ({ on, onChange }) => (
@@ -451,73 +624,266 @@ function AdminProductMgmt() {
 
   if (editing) {
     const f = editing; const setF = setEditing;
-    const totalStock = Object.values(f.stock).reduce((a,b)=>a+b,0);
+    const sizes = normalizeSizes(f.sizeText ?? (f.sizes || []));
+    const colors = uniqueColors(f.colorText || '');
+    const totalStock = colors.length
+      ? colors.reduce((sum, c) => sum + sizes.reduce((rowSum, s) => rowSum + Number(f.stockByColorSize?.[c.id]?.[s] || 0), 0), 0)
+      : sizes.reduce((sum, s) => sum + Number(f.stock?.[s] || 0), 0);
+    const hasColorStock = Object.keys(f.stockByColorSize || {}).length > 0;
+    const addSize = () => { const v = newSize.trim(); if (!v) return; setEditingSizes([...sizes, v]); setNewSize(''); };
+    const removeSize = size => setEditingSizes(sizes.filter(s => s !== size));
+    const setPlainStock = (size, qty) => setF(p => ({ ...p, stock:{ ...p.stock, [size]:Math.max(0, parseInt(qty, 10) || 0) } }));
+    const setColorStock = (colorId, size, qty) => setF(p => ({ ...p, stockByColorSize:{ ...p.stockByColorSize, [colorId]:{ ...(p.stockByColorSize?.[colorId] || {}), [size]:Math.max(0, parseInt(qty, 10) || 0) } } }));
+    const togglePaletteColor = (colorId) => {
+      const cur = uniqueColors(f.colorText || '');
+      const isSel = cur.some(c => c.id === colorId);
+      const next = isSel ? cur.filter(c => c.id !== colorId) : [...cur, WORKWEAR_COLORS[colorId]].filter(Boolean);
+      setF(p => ({ ...p, colorText: next.map(c => c.name).join(', ') }));
+    };
+    const selectedColorIds = new Set(colors.map(c => c.id));
+    const allColors = Object.values(WORKWEAR_COLORS);
+    const presets = SIZE_PRESETS[f.cat] || [['일반', ['S','M','L','XL','2XL']]];
+    const TabBtn = ({ id, label }) => (
+      <button onClick={() => setEditTab(id)} style={{ padding:'8px 20px', borderRadius:999, border:'none', cursor:'pointer', fontSize:13, fontWeight:700, fontFamily:PF, background:editTab===id?'var(--accent)':'rgba(10,37,64,0.06)', color:editTab===id?'#fff':'var(--fg-2)', transition:'all 150ms' }}>{label}</button>
+    );
     return (
       <div className="content">
-        <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:4 }}>
+        {/* 헤더 */}
+        <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:12 }}>
           <button className="btn btn-secondary btn-sm" onClick={() => setEditing(null)}><Icon name="chevronL"/> 목록</button>
-          <span style={{ fontFamily:'var(--font-display)', fontWeight:600, fontSize:16, color:'var(--fg-1)' }}>{f.id > 1e12 ? '상품 추가' : '상품 수정'}</span>
+          <span style={{ fontFamily:'var(--font-display)', fontWeight:600, fontSize:16, color:'var(--fg-1)' }}>{isUuid(f.id) ? '상품 수정' : '상품 추가'}</span>
+          <span className={`chip ${f.active ? 'chip-ok' : 'chip-neutral'}`}>{f.active ? '판매중' : '비활성'}</span>
         </div>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 260px', gap:18, alignItems:'start' }}>
-          <div className="glass-card" style={{ display:'flex', flexDirection:'column', gap:15 }}>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-              <div><label className="form-label">상품명</label><input className="form-input" value={f.name} onChange={e => setF(p => ({...p, name:e.target.value}))} placeholder="상품명"/></div>
-              <div><label className="form-label">카테고리</label>
-                <select className="form-select" value={f.cat} onChange={e => setF(p => ({...p, cat:e.target.value}))}>
-                  {CATS.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
+        {/* 탭 */}
+        <div style={{ display:'flex', gap:8, marginBottom:18 }}>
+          <TabBtn id="basic" label="기본 정보"/>
+          <TabBtn id="content" label="상세 콘텐츠"/>
+          <TabBtn id="options" label="옵션·재고"/>
+        </div>
+
+        {/* 탭 1: 기본 정보 */}
+        {editTab === 'basic' && (
+          <div style={{ display:'flex', flexDirection:'column', gap:14, maxWidth:620 }}>
+            <div className="glass-card" style={{ display:'flex', flexDirection:'column', gap:14, borderRadius:16 }}>
+              <div style={{fontSize:15, fontWeight:800, color:'var(--fg-1)', fontFamily:'var(--font-display)'}}>기본 정보</div>
+              <div className="admin-basic-grid">
+                <div><label className="form-label">상품명</label><input className="form-input" value={f.name} onChange={e => setF(p => ({...p, name:e.target.value}))} placeholder="상품명"/></div>
+                <div><label className="form-label">카테고리</label>
+                  <select className="form-select" value={f.cat} onChange={e => setF(p => ({...p, cat:e.target.value}))}>
+                    {CATS.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
               </div>
-            </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12 }}>
-              <div><label className="form-label">가격 (P)</label><input className="form-input" type="number" value={f.pts} onChange={e => setF(p => ({...p, pts:parseInt(e.target.value)||0}))}/></div>
-              <div><label className="form-label">이모지 썸네일</label><input className="form-input" value={f.thumb} onChange={e => setF(p => ({...p, thumb:e.target.value}))} style={{ textAlign:'center', fontSize:22 }} placeholder="🧥"/></div>
-              <div><label className="form-label">뱃지</label>
-                <select className="form-select" value={f.tag||''} onChange={e => setF(p => ({...p, tag:e.target.value}))}>
-                  <option value="">없음</option><option value="인기">인기</option><option value="신상">신상</option><option value="재고부족">재고부족</option>
-                </select>
+              <div className="admin-meta-grid">
+                <div><label className="form-label">가격 (P)</label><input className="form-input" type="number" value={f.pts} onChange={e => setF(p => ({...p, pts:parseInt(e.target.value)||0}))}/></div>
+                <div><label className="form-label">이모지 폴백</label><input className="form-input" value={f.thumb} onChange={e => setF(p => ({...p, thumb:e.target.value}))} style={{ textAlign:'center', fontSize:22 }} placeholder="🧥"/></div>
+                <div><label className="form-label">뱃지</label>
+                  <select className="form-select" value={f.tag||''} onChange={e => setF(p => ({...p, tag:e.target.value}))}>
+                    <option value="">없음</option><option value="인기">인기</option><option value="신상">신상</option><option value="재고부족">재고부족</option>
+                  </select>
+                </div>
               </div>
-            </div>
-            <div><label className="form-label">상품 설명</label><textarea className="form-input" rows={3} value={f.desc||''} onChange={e => setF(p => ({...p, desc:e.target.value}))} style={{ resize:'vertical' }} placeholder="상품 상세 설명"/></div>
-            <div>
-              <label className="form-label">사이즈별 재고</label>
-              <div style={{ display:'flex', gap:12, flexWrap:'wrap' }}>
-                {f.sizes.map(s => (
-                  <div key={s} style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:5 }}>
-                    <div style={{ fontSize:11, fontWeight:600, color:'var(--fg-3)', fontFamily:PF }}>{s}</div>
-                    <input type="number" value={f.stock[s]||0} onChange={e => setF(p => ({...p, stock:{...p.stock, [s]:parseInt(e.target.value)||0}}))}
-                      style={{ width:56, textAlign:'center', padding:'7px 4px', borderRadius:9, border:'1px solid var(--border-hairline)', fontFamily:PF, fontSize:14, background:'rgba(255,255,255,0.8)' }}/>
+              <div style={{ display:'flex', gap:24, flexWrap:'wrap', paddingTop:4 }}>
+                {[{ label:'판매 활성화', key:'active' }, { label:'추천 노출', key:'featured' }].map(({label,key}) => (
+                  <div key={key} style={{ display:'flex', alignItems:'center', gap:10 }}>
+                    <span style={{ fontSize:13, fontWeight:600, color:'var(--fg-2)', fontFamily:PF }}>{label}</span>
+                    <Toggle on={!!f[key]} onChange={() => setF(p => ({...p, [key]:!p[key]}))}/>
                   </div>
                 ))}
               </div>
             </div>
-            <div style={{ display:'flex', gap:24, flexWrap:'wrap' }}>
-              {[{ label:'판매 활성화', key:'active' }, { label:'추천 노출', key:'featured' }].map(({label,key}) => (
-                <div key={key} style={{ display:'flex', alignItems:'center', gap:10 }}>
-                  <span style={{ fontSize:13, fontWeight:500, color:'var(--fg-2)', fontFamily:PF }}>{label}</span>
-                  <div onClick={() => setF(p => ({...p, [key]:!p[key]}))} style={{ width:44, height:24, borderRadius:999, cursor:'pointer', background: f[key] ? 'var(--accent)' : 'rgba(10,37,64,0.15)', position:'relative', transition:'background 200ms' }}>
-                    <div style={{ width:18, height:18, borderRadius:999, background:'#fff', position:'absolute', top:3, left: f[key] ? 23 : 3, transition:'left 200ms', boxShadow:'0 1px 3px rgba(0,0,0,0.2)' }}/>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
-              <button className="btn btn-secondary" onClick={() => setEditing(null)}>취소</button>
-              <button className="btn btn-primary" onClick={() => saveProduct(f)}><Icon name="check"/> 저장</button>
-            </div>
           </div>
-          {/* 미리보기 */}
-          <div>
-            <div style={{ fontSize:11, fontWeight:600, color:'var(--fg-3)', letterSpacing:'0.05em', textTransform:'uppercase', marginBottom:10 }}>미리보기</div>
-            <div style={{ background:'rgba(255,255,255,0.78)', border:'1px solid rgba(255,255,255,0.65)', borderRadius:16, overflow:'hidden', boxShadow:'0 2px 8px rgba(10,37,64,0.06)' }}>
-              <div style={{ height:170, background:'linear-gradient(145deg,#EAF4FF,#D4E8FB)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:80 }}>{f.thumb||'📦'}</div>
-              <div style={{ padding:'12px 14px 16px' }}>
-                <div style={{ fontSize:11, color:'var(--fg-3)', fontFamily:PF, marginBottom:3 }}>{f.cat}</div>
-                <div style={{ fontSize:14, fontWeight:700, color:'var(--fg-1)', lineHeight:1.3 }}>{f.name||'상품명'}</div>
-                <div style={{ fontSize:16, fontWeight:800, color:'var(--accent)', marginTop:7 }}>{fmtPts(f.pts)}<span style={{ fontSize:11, fontWeight:500, marginLeft:2, color:'var(--fg-3)' }}>P</span></div>
-                <div style={{ fontSize:11, color:'var(--fg-4)', marginTop:4, fontFamily:PF }}>총 재고 {totalStock}개</div>
+        )}
+
+        {/* 탭 2: 상세 콘텐츠 */}
+        {editTab === 'content' && (
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 280px', gap:16, alignItems:'start' }}>
+            <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+              <div className="glass-card" style={{ display:'flex', flexDirection:'column', gap:12, borderRadius:16 }}>
+                <div style={{fontSize:15, fontWeight:800, color:'var(--fg-1)', fontFamily:'var(--font-display)'}}>이미지</div>
+                <div>
+                  <label className="form-label">메인 이미지 URL</label>
+                  <input className="form-input" value={f.imageUrl||''} onChange={e => setF(p => ({...p, imageUrl:e.target.value}))} placeholder="https://..."/>
+                  {f.imageUrl && <img src={f.imageUrl} alt="" style={{marginTop:8, height:72, objectFit:'contain', borderRadius:8, border:'1px solid rgba(10,37,64,0.08)'}} onError={e => e.target.style.display='none'}/>}
+                </div>
+                <div>
+                  <label className="form-label">추가 이미지 (최대 4장)</label>
+                  {[0,1,2,3].map(i => (
+                    <div key={i} style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
+                      <input className="form-input" value={(f.extraImages||[])[i]||''} onChange={e => { const imgs=[...(f.extraImages||[])]; imgs[i]=e.target.value; setF(p=>({...p,extraImages:imgs})); }} placeholder={`추가 이미지 ${i+1} URL`} style={{flex:1}}/>
+                      {(f.extraImages||[])[i] && <img src={(f.extraImages||[])[i]} alt="" style={{height:36,width:36,objectFit:'contain',borderRadius:6,border:'1px solid rgba(10,37,64,0.08)',flexShrink:0}} onError={e=>e.target.style.display='none'}/>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="glass-card" style={{ display:'flex', flexDirection:'column', gap:12, borderRadius:16 }}>
+                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                  <div style={{fontSize:15, fontWeight:800, color:'var(--fg-1)', fontFamily:'var(--font-display)'}}>상세 문구</div>
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => setF(p => ({ ...p, detailInfo:DEFAULT_DETAIL, shippingInfo:DEFAULT_SHIPPING, returnInfo:DEFAULT_RETURN }))}>기본값 채우기</button>
+                </div>
+                <div><label className="form-label">요약 설명 <span style={{fontSize:11,color:'var(--fg-3)',fontWeight:400}}>(상세페이지 상단 소개문구)</span></label><textarea className="form-input" rows={3} value={f.desc||''} onChange={e => setF(p => ({...p, desc:e.target.value}))} style={{ resize:'vertical', borderRadius:18 }} placeholder="상품 한 줄 소개. 상세페이지 상단에 표시됩니다."/></div>
+                <div><label className="form-label">상품 정보</label><textarea className="form-input" rows={5} value={f.detailInfo||''} onChange={e => setF(p => ({...p, detailInfo:e.target.value}))} style={{ resize:'vertical', borderRadius:18 }}/></div>
+                <div><label className="form-label">배송 안내</label><textarea className="form-input" rows={4} value={f.shippingInfo||''} onChange={e => setF(p => ({...p, shippingInfo:e.target.value}))} style={{ resize:'vertical', borderRadius:18 }}/></div>
+                <div><label className="form-label">교환·반품</label><textarea className="form-input" rows={4} value={f.returnInfo||''} onChange={e => setF(p => ({...p, returnInfo:e.target.value}))} style={{ resize:'vertical', borderRadius:18 }}/></div>
               </div>
             </div>
+            {/* 실시간 미리보기 */}
+            <div style={{ position:'sticky', top:16 }}>
+              <div style={{ fontSize:11, fontWeight:600, color:'var(--fg-3)', letterSpacing:'0.05em', textTransform:'uppercase', marginBottom:10 }}>미리보기</div>
+              <div style={{ background:'rgba(255,255,255,0.78)', border:'1px solid rgba(255,255,255,0.65)', borderRadius:16, overflow:'hidden', boxShadow:'0 2px 8px rgba(10,37,64,0.06)' }}>
+                <div style={{ height:170, background:'linear-gradient(145deg,#EAF4FF,#D4E8FB)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:80 }}>
+                  {f.imageUrl ? <img src={f.imageUrl} alt={f.name} style={{maxWidth:'72%', maxHeight:'72%', objectFit:'contain'}}/> : (f.thumb||'📦')}
+                </div>
+                <div style={{ padding:'12px 14px 16px' }}>
+                  <div style={{ fontSize:11, color:'var(--fg-3)', fontFamily:PF, marginBottom:3 }}>{f.cat}</div>
+                  <div style={{ fontSize:14, fontWeight:700, color:'var(--fg-1)', lineHeight:1.3 }}>{f.name||'상품명'}</div>
+                  {f.desc && <div style={{ fontSize:12, color:'var(--fg-3)', marginTop:5, lineHeight:1.5, fontFamily:PF }}>{f.desc}</div>}
+                  <div style={{ fontSize:16, fontWeight:800, color:'var(--accent)', marginTop:7 }}>{fmtPts(f.pts)}<span style={{ fontSize:11, fontWeight:500, marginLeft:2, color:'var(--fg-3)' }}>P</span></div>
+                  <div style={{ marginTop:12, paddingTop:10, borderTop:'1px solid rgba(10,37,64,0.08)' }}>
+                    {[['상품 정보', f.detailInfo], ['배송 안내', f.shippingInfo], ['교환·반품', f.returnInfo]].map(([label, txt], i) => (
+                      <div key={label} style={{padding:'8px 0', borderBottom:i===2?'none':'1px solid rgba(10,37,64,0.06)'}}>
+                        <div style={{display:'flex', justifyContent:'space-between', fontSize:12, fontWeight:700, color:'var(--fg-1)'}}><span>{label}</span><span>⌄</span></div>
+                        {txt && <div style={{fontSize:11, color:'var(--fg-3)', marginTop:4, lineHeight:1.5, fontFamily:PF}}>{txt.slice(0,90)}{txt.length>90?'…':''}</div>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              {(f.extraImages||[]).some(Boolean) && (
+                <div style={{ display:'flex', gap:6, marginTop:8, flexWrap:'wrap' }}>
+                  {(f.extraImages||[]).filter(Boolean).map((url,i) => (
+                    <img key={i} src={url} alt="" style={{height:48,width:48,objectFit:'contain',borderRadius:8,border:'1px solid rgba(10,37,64,0.08)',background:'#f5f8ff'}} onError={e=>e.target.style.display='none'}/>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
+        )}
+
+        {/* 탭 3: 옵션·재고 */}
+        {editTab === 'options' && (
+          <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+            {/* 색상 팔레트 */}
+            <div className="glass-card" style={{ display:'flex', flexDirection:'column', gap:14, borderRadius:16 }}>
+              <div style={{fontSize:15, fontWeight:800, color:'var(--fg-1)', fontFamily:'var(--font-display)'}}>색상</div>
+              <div>
+                <div style={{fontSize:12, color:'var(--fg-3)', fontFamily:PF, marginBottom:8}}>클릭으로 선택 / 해제</div>
+                <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                  {allColors.map(c => {
+                    const isSel = selectedColorIds.has(c.id);
+                    return (
+                      <button key={c.id} type="button" onClick={() => togglePaletteColor(c.id)} style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'5px 10px 5px 7px', borderRadius:999, border:isSel?'2px solid var(--accent)':'1px solid rgba(10,37,64,0.12)', background:isSel?'rgba(47,128,237,0.08)':'rgba(255,255,255,0.7)', cursor:'pointer', fontSize:12, fontWeight:isSel?800:500, color:isSel?'var(--accent)':'var(--fg-2)', fontFamily:PF, transition:'all 120ms' }}>
+                        <span style={{width:14,height:14,borderRadius:999,background:c.value,border:'1px solid rgba(0,0,0,0.14)',flexShrink:0}}/>
+                        {c.name}
+                        {isSel && <span style={{fontSize:10,color:'var(--accent)'}}>✓</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              {colors.length > 0 && (
+                <div style={{display:'flex', gap:6, flexWrap:'wrap', paddingTop:8, borderTop:'1px solid rgba(10,37,64,0.06)'}}>
+                  <span style={{fontSize:12, color:'var(--fg-3)', fontFamily:PF, alignSelf:'center'}}>선택됨:</span>
+                  {colors.map(c => <span key={c.id} style={{display:'inline-flex', alignItems:'center', gap:6, fontSize:12, color:'var(--fg-2)', fontFamily:PF, padding:'5px 9px', borderRadius:999, background:'rgba(255,255,255,0.7)', border:'1px solid rgba(10,37,64,0.06)'}}><span style={{width:12,height:12,borderRadius:999,background:c.value,border:'1px solid rgba(0,0,0,0.14)'}}/>{c.name}</span>)}
+                </div>
+              )}
+              <div>
+                <label className="form-label" style={{color:'var(--fg-4)', fontSize:11}}>직접 입력 (쉼표 구분)</label>
+                <input className="form-input" value={f.colorText||''} onChange={e => setF(p => ({...p, colorText:e.target.value}))} placeholder="블랙, 네이비" style={{fontSize:12}}/>
+              </div>
+            </div>
+            {/* 사이즈 */}
+            <div className="glass-card" style={{ display:'flex', flexDirection:'column', gap:14, borderRadius:16 }}>
+              <div style={{fontSize:15, fontWeight:800, color:'var(--fg-1)', fontFamily:'var(--font-display)'}}>사이즈</div>
+              <div>
+                <div style={{fontSize:12, color:'var(--fg-3)', fontFamily:PF, marginBottom:8}}>빠른 선택</div>
+                <div style={{display:'flex', gap:8, flexWrap:'wrap'}}>
+                  {presets.map(([label, preset]) => (
+                    <button key={label} type="button" className="btn btn-secondary btn-sm" onClick={() => setEditingSizes(preset)} style={{fontSize:12}}>
+                      {label}: {preset.join(' · ')}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="form-label">직접 추가</label>
+                <div style={{display:'flex', gap:8}}>
+                  <input className="form-input" value={newSize} onChange={e => setNewSize(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addSize(); } }} placeholder="예: 4L" style={{minWidth:0}}/>
+                  <button type="button" className="btn btn-secondary" onClick={addSize} style={{height:38, whiteSpace:'nowrap'}}><Icon name="plus"/> 추가</button>
+                </div>
+              </div>
+              <div style={{display:'flex', gap:8, flexWrap:'wrap'}}>
+                {sizes.map(s => {
+                  const sizeTotal = colors.length ? colors.reduce((sum, c) => sum + Number(f.stockByColorSize?.[c.id]?.[s] || 0), 0) : Number(f.stock?.[s] || 0);
+                  return (
+                    <span key={s} style={{display:'inline-flex', alignItems:'center', gap:6, padding:'5px 6px 5px 10px', borderRadius:999, background:'#fff', border:'1px solid rgba(10,37,64,0.08)', fontSize:12, fontWeight:800, color:'var(--fg-1)', fontFamily:PF}}>
+                      {s}<StockPill qty={sizeTotal}/>
+                      <button type="button" onClick={() => removeSize(s)} aria-label={`${s} 삭제`} style={{width:22,height:22,borderRadius:999,border:'none',background:'rgba(10,37,64,0.06)',color:'var(--fg-3)',cursor:'pointer',display:'inline-flex',alignItems:'center',justifyContent:'center',padding:0}}><Icon name="x" size={12}/></button>
+                    </span>
+                  );
+                })}
+                {sizes.length === 0 && <span style={{fontSize:12, color:'var(--fg-3)', fontFamily:PF}}>사이즈를 선택하거나 추가하세요.</span>}
+              </div>
+            </div>
+            {/* 재고 매트릭스 */}
+            {sizes.length > 0 && (
+              <div className="glass-card" style={{ display:'flex', flexDirection:'column', gap:12, borderRadius:16 }}>
+                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                  <div style={{fontSize:15, fontWeight:800, color:'var(--fg-1)', fontFamily:'var(--font-display)'}}>재고</div>
+                  <div style={{display:'flex', gap:8, alignItems:'center'}}>
+                    <span style={{fontSize:12, color:'var(--fg-3)', fontFamily:PF}}>총 {totalStock}개</span>
+                    <StockPill qty={totalStock}/>
+                  </div>
+                </div>
+                {colors.length > 0 ? (
+                  <div style={{overflowX:'auto', paddingBottom:2}}>
+                    <div style={{display:'flex', flexDirection:'column', gap:8, minWidth:Math.max(420, 140 + sizes.length * 110)}}>
+                      <div style={{display:'grid', gridTemplateColumns:`130px repeat(${Math.max(sizes.length,1)}, minmax(100px, 1fr))`, gap:8, alignItems:'center'}}>
+                        <div></div>
+                        {sizes.map(s => <div key={s} style={{fontSize:12,fontWeight:800,color:'var(--fg-2)',textAlign:'center',fontFamily:PF}}>{s}</div>)}
+                      </div>
+                      {colors.map((c, ci) => (
+                        <div key={c.id} style={{display:'grid', gridTemplateColumns:`130px repeat(${Math.max(sizes.length,1)}, minmax(100px, 1fr))`, gap:8, alignItems:'start', background:ci%2===0?'rgba(10,37,64,0.02)':'transparent', borderRadius:8, padding:'4px 0'}}>
+                          <div style={{display:'flex', alignItems:'center', gap:7, minHeight:40, fontSize:12, fontWeight:700, color:'var(--fg-2)', fontFamily:PF, minWidth:0, paddingLeft:6}}>
+                            <span style={{width:14,height:14,borderRadius:999,background:c.value,border:'1px solid rgba(0,0,0,0.14)',flexShrink:0}}/>
+                            <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.name}</span>
+                          </div>
+                          {sizes.map(s => {
+                            const qty = Number(f.stockByColorSize?.[c.id]?.[s] ?? (hasColorStock ? 0 : f.stock?.[s] ?? 0));
+                            return (
+                              <div key={`${c.id}-${s}`} style={{display:'flex', flexDirection:'column', gap:5, minWidth:0}}>
+                                <input type="number" min="0" value={qty} onChange={e => setColorStock(c.id, s, e.target.value)} style={{width:'100%',textAlign:'center',padding:'9px 4px',borderRadius:9,border:'1px solid var(--border-hairline)',fontFamily:PF,fontSize:14,background:'#fff'}}/>
+                                <div style={{display:'flex', gap:5, alignItems:'center', justifyContent:'center', minHeight:22}}><StockPill qty={qty}/></div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(100px, 1fr))', gap:10}}>
+                    {sizes.map(s => (
+                      <div key={s} style={{padding:12, border:'1px solid rgba(10,37,64,0.08)', borderRadius:12, background:'rgba(255,255,255,0.58)'}}>
+                        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap:8, marginBottom:8}}>
+                          <div style={{fontSize:13, fontWeight:800, color:'var(--fg-1)', fontFamily:PF}}>{s}</div>
+                          <StockPill qty={f.stock?.[s] || 0}/>
+                        </div>
+                        <input type="number" min="0" value={f.stock?.[s]||0} onChange={e => setPlainStock(s, e.target.value)} style={{width:'100%',textAlign:'center',padding:'9px 4px',borderRadius:9,border:'1px solid var(--border-hairline)',fontFamily:PF,fontSize:14,background:'#fff'}}/>
+                        {Number(f.stock?.[s] || 0) > 0 && <button type="button" onClick={() => setPlainStock(s, 0)} style={{width:'100%',marginTop:8,border:'none',background:'rgba(10,37,64,0.04)',color:'var(--fg-3)',borderRadius:8,padding:'6px 4px',fontSize:11,fontWeight:800,fontFamily:PF,cursor:'pointer'}}>품절 처리</button>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 저장/취소 항상 표시 */}
+        <div className="glass-card" style={{display:'flex', justifyContent:'flex-end', gap:10, marginTop:4, borderRadius:16}}>
+          <button className="btn btn-secondary" onClick={() => setEditing(null)}>취소</button>
+          <button className="btn btn-primary" disabled={saving} onClick={() => saveProduct(f)}><Icon name="check"/> {saving ? '저장 중...' : '저장'}</button>
         </div>
       </div>
     );
@@ -531,7 +897,7 @@ function AdminProductMgmt() {
           <svg viewBox="0 0 24 24" style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)' }}><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
           <input className="form-input" style={{ paddingLeft:38 }} placeholder="상품명 검색" value={search} onChange={e => setSearch(e.target.value)}/>
         </div>
-        <button className="btn btn-primary" onClick={() => setEditing({ id:Date.now(), name:'', cat:'상의', pts:0, thumb:'📦', sizes:['S','M','L','XL','2XL'], stock:{S:0,M:0,L:0,XL:0,'2XL':0}, tag:'', active:true, featured:false, desc:'' })}>
+        <button className="btn btn-primary" onClick={() => setEditing(editProduct({ id:Date.now(), name:'', cat:'상의', pts:0, thumb:'📦', imageUrl:'', colors:[WORKWEAR_COLORS.black], sizes:['S','M','L','XL','2XL'], stock:{S:0,M:0,L:0,XL:0,'2XL':0}, tag:'', active:true, featured:false, desc:'', detailInfo:DEFAULT_DETAIL, shippingInfo:DEFAULT_SHIPPING, returnInfo:DEFAULT_RETURN }))}>
           <Icon name="plus"/> 상품 추가
         </button>
       </div>
@@ -545,7 +911,7 @@ function AdminProductMgmt() {
                 <tr key={p.id}>
                   <td>
                     <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-                      <div style={{ width:40, height:40, borderRadius:10, background:'linear-gradient(145deg,#EAF4FF,#D4E8FB)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20, flexShrink:0 }}>{p.thumb}</div>
+                      <div style={{ width:40, height:40, borderRadius:10, background:'linear-gradient(145deg,#EAF4FF,#D4E8FB)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20, flexShrink:0 }}>{p.imageUrl ? <img src={p.imageUrl} alt={p.name} style={{maxWidth:'74%', maxHeight:'74%', objectFit:'contain'}}/> : p.thumb}</div>
                       <div>
                         <div style={{ fontWeight:600, fontSize:13 }}>{p.name}</div>
                         {p.tag && <span className={`chip ${p.tag==='인기'?'chip-info':'chip-warn'}`} style={{ marginTop:2 }}>{p.tag}</span>}
@@ -554,9 +920,17 @@ function AdminProductMgmt() {
                   </td>
                   <td style={{ color:'var(--fg-3)', fontSize:13 }}>{p.cat}</td>
                   <td style={{ fontFamily:'var(--font-display)', fontWeight:700, color:'var(--accent)', fontSize:14 }}>{fmtPts(p.pts)}P</td>
-                  <td style={{ fontWeight:600, color: total===0?'var(--err)':total<=5?'var(--warn)':'var(--fg-1)' }}>{total}</td>
+                  <td style={{ fontWeight:600, color: total===0?'var(--err)':total<=5?'var(--warn)':'var(--fg-1)' }}>
+                    <span style={{ marginRight:8 }}>{total}</span>
+                    {total===0 && <span style={{fontSize:11, fontWeight:800, color:'var(--err)', background:'rgba(226, 55, 68, 0.09)', border:'1px solid rgba(226, 55, 68, 0.24)', borderRadius:999, padding:'2px 7px'}}>품절</span>}
+                  </td>
                   <td><Toggle on={p.active} onChange={() => toggleActive(p.id)}/></td>
-                  <td style={{ textAlign:'center' }}><button className="btn btn-secondary btn-sm" onClick={() => setEditing({...p})}><Icon name="edit" size={13}/> 수정</button></td>
+                  <td style={{ textAlign:'center' }}>
+                    <div style={{ display:'flex', gap:6, justifyContent:'center' }}>
+                      <button className="btn btn-secondary btn-sm" onClick={() => setEditing(editProduct(p))}><Icon name="edit" size={13}/> 수정</button>
+                      <button className="btn btn-sm" onClick={() => deleteProduct(p.id)} style={{ background:'rgba(226,55,68,0.08)', color:'var(--err)', border:'1px solid rgba(226,55,68,0.2)' }}><Icon name="trash" size={13}/></button>
+                    </div>
+                  </td>
                 </tr>
               );
             })}

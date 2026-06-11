@@ -162,18 +162,114 @@ html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
 .kpi-delta { margin-top: 8px; font-size: 11.5px; font-weight: 600; }
 
 /* ---------- Product Grid ---------- */
-.product-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; }
+.product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+.catalog-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+.nike-catalog {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background: #fff;
+}
+.nike-catalog-head {
+  border-bottom: 1px solid #e9e9e9;
+  flex-shrink: 0;
+  padding: 0 24px;
+}
+.nike-catalog-inner {
+  max-width: 960px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0 0;
+}
+.nike-cats { display: flex; gap: 14px; overflow-x: auto; }
+.nike-cats button {
+  border: none;
+  background: transparent;
+  color: #707072;
+  font: 500 13px/1.2 var(--font-sans);
+  padding: 12px 0 11px;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.nike-cats button.active { color: #111; border-bottom-color: #111; }
+.nike-search { position: relative; width: 220px; flex-shrink: 0; margin-bottom: 8px; }
+.nike-search svg {
+  position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+  width: 15px; height: 15px; fill: none; stroke: #707072; stroke-width: 1.75; stroke-linecap: round;
+}
+.nike-search input {
+  width: 100%;
+  border: 1px solid #e5e5e5;
+  border-radius: 18px;
+  background: #f7f7f7;
+  padding: 8px 12px 8px 32px;
+  font: 500 12px/1.2 var(--font-sans);
+  color: #111;
+}
+.nike-count {
+  padding: 10px 24px 0;
+  font: 500 12px/1.2 var(--font-sans);
+  color: #707072;
+  flex-shrink: 0;
+}
+.nike-catalog-body { flex: 1; overflow-y: auto; padding: 12px 24px 32px; }
+.nike-grid {
+  max-width: 960px;
+  margin: 0 auto;
+  display: grid;
+  gap: 26px 16px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.nike-card { cursor: pointer; }
+.nike-thumb {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  background: #f5f5f5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(52px, 7vw, 76px);
+}
+.nike-meta { padding-top: 10px; }
+.nike-cat {
+  font: 600 11px/1.35 var(--font-sans);
+  color: #8d8d8f;
+  margin-bottom: 4px;
+}
+.nike-name {
+  font: 600 17px/1.3 var(--font-sans);
+  color: #111;
+  letter-spacing: -0.01em;
+}
+.nike-price {
+  margin-top: 8px;
+  font: 700 16px/1.2 var(--font-sans);
+  color: #111;
+}
 .product-card {
   background: var(--surface-glass); backdrop-filter: blur(20px) saturate(140%);
   border: 1px solid var(--border-hairline); border-radius: 18px;
   overflow: hidden; cursor: pointer;
   box-shadow: var(--shadow-sm), inset 0 1px 0 var(--border-inner);
   transition: box-shadow 180ms, transform 180ms;
+  display: flex; flex-direction: column;
 }
 .product-card:hover { box-shadow: var(--shadow-lg); transform: translateY(-2px); }
 .product-thumb {
-  height: 140px; background: linear-gradient(135deg, #EAF4FF 0%, #D4E8FB 100%);
+  aspect-ratio: 1 / 1; height: auto; background: linear-gradient(135deg, #EAF4FF 0%, #D4E8FB 100%);
   display: flex; align-items: center; justify-content: center; position: relative;
+  padding: 16px;
 }
 .product-thumb .cat-icon { font-size: 48px; opacity: 0.35; }
 .product-thumb .stock-badge { position: absolute; top: 10px; right: 10px; }
@@ -182,6 +278,25 @@ html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
 .product-cat { font-size: 11px; color: var(--fg-3); margin-top: 2px; font-family: var(--font-sans); }
 .product-pts { font-family: var(--font-display); font-weight: 700; font-size: 20px; color: var(--accent); letter-spacing: -0.01em; margin-top: 8px; }
 .product-pts span { font-size: 12px; font-weight: 500; color: var(--fg-3); }
+
+@media (max-width: 640px) {
+  .product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .catalog-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .nike-catalog-head { padding: 8px 12px 0; }
+  .nike-search { display: none; }
+  .nike-count { padding: 10px 12px 0; }
+  .nike-catalog-body { padding: 12px 12px 24px; }
+  .nike-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 10px; }
+  .nike-name { font-size: 14px; }
+  .nike-price { font-size: 14px; }
+}
+@media (max-width: 1200px) {
+  .catalog-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .nike-grid { max-width: 960px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 860px) {
+  .catalog-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 
 /* ---------- Size Selector ---------- */
 .size-grid { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -245,3 +360,47 @@ html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
 /* ---------- Inventory ---------- */
 .stock-bar-wrap { background: rgba(214,232,255,0.4); border-radius: 4px; height: 6px; overflow: hidden; flex: 1; min-width: 60px; }
 .stock-bar { height: 100%; border-radius: 4px; transition: width 400ms; }
+
+/* ---------- Admin product editor ---------- */
+.admin-product-edit-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 18px;
+  align-items: start;
+}
+.admin-basic-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 12px;
+}
+.admin-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.admin-two-grid,
+.admin-option-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.admin-option-grid {
+  grid-template-columns: 1fr 1.15fr;
+  align-items: start;
+}
+@media (max-width: 920px) {
+  .admin-product-edit-layout,
+  .admin-basic-grid,
+  .admin-two-grid,
+  .admin-option-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .admin-meta-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 520px) {
+  .admin-meta-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

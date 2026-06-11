@@ -18,6 +18,7 @@ Deno.serve(async (req) => {
   if (req.method === 'DELETE' && /^\/[0-9a-fA-F-]{36}$/.test(path)) return deactivateProduct(ctx, path.slice(1));
   if (req.method === 'POST' && /^\/[0-9a-fA-F-]{36}\/variants$/.test(path)) return createVariant(ctx, path.split('/')[1]);
   if (req.method === 'PUT' && /^\/variants\/[0-9a-fA-F-]{36}$/.test(path)) return updateVariantStock(ctx, path.split('/')[2]);
+  if (req.method === 'DELETE' && /^\/variants\/[0-9a-fA-F-]{36}$/.test(path)) return deactivateVariant(ctx, path.split('/')[2]);
 
   return error(404, 'NOT_FOUND', '지원하지 않는 엔드포인트입니다.');
 });
@@ -47,7 +48,7 @@ async function productDetail({ supabase }: Ctx, productId: string) {
   const { data: product, error: pErr } = await supabase.from('products').select('*').eq('id', productId).single();
   if (pErr || !product) return error(404, 'NOT_FOUND', '상품을 찾을 수 없습니다.');
 
-  const { data: variants, error: vErr } = await supabase.from('product_variants').select('*').eq('product_id', productId);
+  const { data: variants, error: vErr } = await supabase.from('product_variants').select('*').eq('product_id', productId).eq('is_active', true);
   if (vErr) return error(500, 'INTERNAL_ERROR', vErr.message);
 
   return json({ ...product, variants: variants ?? [] });
@@ -59,7 +60,7 @@ async function createProduct({ req, supabase, userId }: Ctx) {
   const body = await req.json().catch(() => null);
   if (!body?.name || !body?.point_price) return error(400, 'VALIDATION_ERROR', 'name, point_price는 필수입니다.');
 
-  const { data, error: createErr } = await supabase.from('products').insert(body).select('*').single();
+  const { data, error: createErr } = await supabase.from('products').insert(productPayload(body)).select('*').single();
   if (createErr) return error(400, 'VALIDATION_ERROR', createErr.message);
   return json(data, 201);
 }
@@ -67,9 +68,21 @@ async function createProduct({ req, supabase, userId }: Ctx) {
 async function updateProduct({ req, supabase, userId }: Ctx, productId: string) {
   if (!(await requireAdmin(supabase, userId))) return error(403, 'FORBIDDEN', '관리자만 수정할 수 있습니다.');
   const body = await req.json().catch(() => null);
-  const { data, error: updateErr } = await supabase.from('products').update(body ?? {}).eq('id', productId).select('*').single();
+  const { data, error: updateErr } = await supabase.from('products').update(productPayload(body ?? {}, false)).eq('id', productId).select('*').single();
   if (updateErr) return error(400, 'VALIDATION_ERROR', updateErr.message);
   return json(data);
+}
+
+function productPayload(body: Record<string, unknown>, requirePrice = true) {
+  const payload: Record<string, unknown> = {};
+  const textFields = ['name', 'description', 'image_url', 'category', 'detail_info', 'shipping_info', 'return_info', 'thumbnail', 'badge'];
+  textFields.forEach((key) => {
+    if (Object.prototype.hasOwnProperty.call(body, key)) payload[key] = body[key] === '' ? null : body[key];
+  });
+  if (Object.prototype.hasOwnProperty.call(body, 'point_price') || requirePrice) payload.point_price = Number(body.point_price);
+  if (Object.prototype.hasOwnProperty.call(body, 'is_active')) payload.is_active = Boolean(body.is_active);
+  if (Object.prototype.hasOwnProperty.call(body, 'is_featured')) payload.is_featured = Boolean(body.is_featured);
+  return payload;
 }
 
 async function deactivateProduct({ supabase, userId }: Ctx, productId: string) {
@@ -85,6 +98,21 @@ async function createVariant({ req, supabase, userId }: Ctx, productId: string) 
   const payload = { product_id: productId, size: body?.size, color: body?.color ?? null, stock_qty: Number(body?.stock_qty ?? 0) };
   if (!payload.size) return error(400, 'VALIDATION_ERROR', 'size는 필수입니다.');
 
+  let existingQuery = supabase.from('product_variants').select('*').eq('product_id', productId).eq('size', payload.size);
+  existingQuery = payload.color === null ? existingQuery.is('color', null) : existingQuery.eq('color', payload.color);
+  const { data: existing, error: findErr } = await existingQuery.maybeSingle();
+  if (findErr) return error(400, 'VALIDATION_ERROR', findErr.message);
+  if (existing) {
+    const { data, error: reactivateErr } = await supabase
+      .from('product_variants')
+      .update({ stock_qty: payload.stock_qty, is_active: true })
+      .eq('id', existing.id)
+      .select('*')
+      .single();
+    if (reactivateErr) return error(400, 'VALIDATION_ERROR', reactivateErr.message);
+    return json(data, 200);
+  }
+
   const { data, error: createErr } = await supabase.from('product_variants').insert(payload).select('*').single();
   if (createErr) return error(400, 'VALIDATION_ERROR', createErr.message);
   return json(data, 201);
@@ -97,6 +125,18 @@ async function updateVariantStock({ req, supabase, userId }: Ctx, variantId: str
   if (!Number.isFinite(stockQty) || stockQty < 0) return error(400, 'VALIDATION_ERROR', 'stock_qty는 0 이상 숫자여야 합니다.');
 
   const { data, error: updateErr } = await supabase.from('product_variants').update({ stock_qty: stockQty }).eq('id', variantId).select('*').single();
+  if (updateErr) return error(400, 'VALIDATION_ERROR', updateErr.message);
+  return json(data);
+}
+
+async function deactivateVariant({ supabase, userId }: Ctx, variantId: string) {
+  if (!(await requireAdmin(supabase, userId))) return error(403, 'FORBIDDEN', '관리자만 수정할 수 있습니다.');
+  const { data, error: updateErr } = await supabase
+    .from('product_variants')
+    .update({ is_active: false, stock_qty: 0 })
+    .eq('id', variantId)
+    .select('*')
+    .single();
   if (updateErr) return error(400, 'VALIDATION_ERROR', updateErr.message);
   return json(data);
 }

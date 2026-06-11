@@ -17,6 +17,7 @@ const PAGE_TITLES = {
 
 function App() {
   const [role, setRole] = useApp(null);
+  const [canAdmin, setCanAdmin] = useApp(false);
   const [screen, setScreen] = useApp('home');
   const [cart, setCart] = useApp([]);
   const [selectedProduct, setSelectedProduct] = useApp(null);
@@ -25,26 +26,39 @@ function App() {
   const [password, setPassword] = useApp('');
   const [error, setError] = useApp('');
 
+  async function resolveAccess() {
+    const user = await WW.client.auth.getUser().then(({ data }) => data?.user).catch(() => null);
+    if (!user) return { role: 'employee', canAdmin: false };
+    const metaRole = user.user_metadata?.role || user.app_metadata?.role;
+    if (metaRole === 'admin') return { role: 'admin', canAdmin: true };
+    const isAdmin = await WW.listAdminOrders().then(() => true).catch(() => false);
+    return { role: isAdmin ? 'admin' : 'employee', canAdmin: isAdmin };
+  }
+
   React.useEffect(() => {
     if (!WW?.client) return;
     WW.client.auth.getUser().then(async ({ data }) => {
       if (!data.user) return;
       await WW.bootstrap();
-      setRole('employee');
-      setScreen('home');
+      const access = await resolveAccess();
+      setCanAdmin(access.canAdmin);
+      setRole(access.role);
+      setScreen(access.role === 'admin' ? 'admin-dashboard' : 'home');
     });
   }, []);
 
   const totalQty = cart.reduce((s, i) => s + (i.qty || 1), 0);
   const page = PAGE_TITLES[screen] || { title: screen, sub: '' };
 
-  async function doLogin(loginRole) {
+  async function doLogin() {
     try {
       setError('');
       await WW.signIn(email, password);
       await WW.bootstrap();
-      setRole(loginRole);
-      setScreen(loginRole === 'admin' ? 'admin-dashboard' : 'home');
+      const access = await resolveAccess();
+      setCanAdmin(access.canAdmin);
+      setRole(access.role);
+      setScreen(access.role === 'admin' ? 'admin-dashboard' : 'home');
     } catch (e) {
       setError(e.message || '로그인 실패');
     }
@@ -53,6 +67,7 @@ function App() {
   async function doLogout() {
     await WW.signOut();
     setRole(null);
+    setCanAdmin(false);
     setScreen('home');
     setCart([]);
     setCartOpen(false);
@@ -62,7 +77,7 @@ function App() {
     switch (screen) {
       case 'home': return <EmployeeHome setScreen={setScreen} setSelectedProduct={setSelectedProduct} setCart={setCart} openCart={() => setCartOpen(true)} />;
       case 'catalog': return <EmployeeCatalog setScreen={setScreen} setSelectedProduct={setSelectedProduct} />;
-      case 'detail': return <ProductDetail product={selectedProduct} setScreen={setScreen} cart={cart} setCart={setCart} openCart={() => setCartOpen(true)} />;
+      case 'detail': return <ProductDetail product={selectedProduct} setSelectedProduct={setSelectedProduct} setScreen={setScreen} cart={cart} setCart={setCart} openCart={() => setCartOpen(true)} />;
       case 'orders': return <EmployeeOrders />;
       case 'admin-dashboard': return <AdminDashboard setScreen={setScreen} />;
       case 'admin-orders': return <AdminOrders />;
@@ -86,8 +101,7 @@ function App() {
           <input className="form-input" type="password" placeholder="비밀번호" value={password} onChange={e => setPassword(e.target.value)} style={{ marginBottom: 8 }} />
           {error && <div style={{ color: 'var(--err)', fontSize: 12, marginBottom: 8 }}>{error}</div>}
           <div style={{ display: 'grid', gap: 8 }}>
-            <button className="btn btn-primary" onClick={() => doLogin('employee')}>직원 로그인</button>
-            <button className="btn btn-secondary" onClick={() => doLogin('admin')}>관리자 로그인</button>
+            <button className="btn btn-primary" onClick={doLogin}>로그인</button>
           </div>
         </div>
       </div>
@@ -96,7 +110,7 @@ function App() {
 
   return (
     <div className="app-shell">
-      <Sidebar role={role} setRole={setRole} screen={screen} setScreen={setScreen} openCart={() => setCartOpen(true)} cartQty={totalQty} onLogout={doLogout} />
+      <Sidebar role={role} canAdmin={canAdmin} setRole={setRole} screen={screen} setScreen={setScreen} openCart={() => setCartOpen(true)} cartQty={totalQty} onLogout={doLogout} />
       <div className="main">
         <div className="topbar">
           <div><h2>{page.title}</h2><div className="sub">{page.sub}</div></div>

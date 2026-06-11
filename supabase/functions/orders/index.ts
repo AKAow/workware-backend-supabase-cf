@@ -33,7 +33,7 @@ async function createOrder({ req, supabase, userId }: Ctx) {
   const variantIds = items.map((i: { variant_id: string }) => i.variant_id);
   const { data: variants, error: vErr } = await supabase
     .from('product_variants')
-    .select('id,stock_qty,product_id,products!inner(point_price,is_active)')
+    .select('id,stock_qty,is_active,product_id,products!inner(point_price,is_active)')
     .in('id', variantIds);
   if (vErr) return error(400, 'VALIDATION_ERROR', vErr.message);
 
@@ -42,7 +42,7 @@ async function createOrder({ req, supabase, userId }: Ctx) {
   for (const item of items) {
     const variant = variantMap.get(item.variant_id);
     const qty = Number(item.quantity ?? 1);
-    if (!variant || !variant.products?.is_active) return error(404, 'NOT_FOUND', '상품 옵션을 찾을 수 없습니다.');
+    if (!variant || !variant.is_active || !variant.products?.is_active) return error(404, 'NOT_FOUND', '상품 옵션을 찾을 수 없습니다.');
     if (!Number.isFinite(qty) || qty <= 0) return error(400, 'VALIDATION_ERROR', '수량이 올바르지 않습니다.');
     if (variant.stock_qty < qty) return error(422, 'OUT_OF_STOCK', `재고 부족: ${item.variant_id}`);
     totalPoints += Number(variant.products.point_price) * qty;
