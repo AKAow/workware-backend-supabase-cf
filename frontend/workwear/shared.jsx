@@ -212,6 +212,23 @@ const WW = {
   rejectOrder: (id, reason) => wwApi(`/orders/${id}/reject`, { method: 'POST', body: JSON.stringify({ reason }) }),
   grantPoints: (user_id, amount, note) => wwApi('/points/grant', { method: 'POST', body: JSON.stringify({ user_id, amount, note }) }),
   deleteUser: (id) => wwApi(`/admin/users/${id}`, { method: 'DELETE' }),
+  async updateProfile(id, updates) {
+    if (WW_SUPABASE) {
+      const { error } = await WW_SUPABASE.from('profiles').update(updates).eq('id', id);
+      if (error) throw error;
+      return;
+    }
+    return wwApi(`/admin/users/${id}`, { method: 'PUT', body: JSON.stringify(updates) });
+  },
+  async uploadAsset(bucket, file) {
+    if (!WW_SUPABASE) throw new Error('Supabase 연결 없음');
+    const ext = file.name.split('.').pop();
+    const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const { error } = await WW_SUPABASE.storage.from(bucket).upload(path, file, { upsert: false, cacheControl: '31536000' });
+    if (error) throw error;
+    const { data } = WW_SUPABASE.storage.from(bucket).getPublicUrl(path);
+    return data.publicUrl;
+  },
   async bootstrap() {
     if (!WW_SUPABASE) return;
     const { data } = await WW_SUPABASE.auth.getUser();

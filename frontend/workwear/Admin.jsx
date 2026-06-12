@@ -730,18 +730,48 @@ function AdminProductMgmt() {
               <div className="glass-card" style={{ display:'flex', flexDirection:'column', gap:12, borderRadius:16 }}>
                 <div style={{fontSize:15, fontWeight:800, color:'var(--fg-1)', fontFamily:'var(--font-display)'}}>이미지</div>
                 <div>
-                  <label className="form-label">메인 이미지 URL</label>
-                  <input className="form-input" value={f.imageUrl||''} onChange={e => setF(p => ({...p, imageUrl:e.target.value}))} placeholder="https://..."/>
+                  <label className="form-label">메인 이미지</label>
+                  <div style={{display:'flex', gap:8, alignItems:'center'}}>
+                    <input className="form-input" value={f.imageUrl||''} onChange={e => setF(p => ({...p, imageUrl:e.target.value}))} placeholder="https://... 또는 파일 업로드" style={{flex:1}}/>
+                    <label style={{flexShrink:0, cursor:'pointer', padding:'0 14px', height:38, borderRadius:10, border:'1px solid rgba(10,37,64,0.12)', background:'rgba(255,255,255,0.7)', display:'flex', alignItems:'center', fontSize:12, fontWeight:700, color:'var(--fg-2)', whiteSpace:'nowrap', gap:4}}>
+                      <Icon name="plus" size={13}/>업로드
+                      <input type="file" accept="image/*" style={{display:'none'}} onChange={async e => {
+                        const file = e.target.files?.[0]; if (!file) return;
+                        try { const url = await WW.uploadAsset('workwear-assets', file); setF(p => ({...p, imageUrl: url})); }
+                        catch(err) { alert('업로드 실패: ' + err.message); }
+                        e.target.value = '';
+                      }}/>
+                    </label>
+                  </div>
                   {f.imageUrl && <img src={f.imageUrl} alt="" style={{marginTop:8, height:72, objectFit:'contain', borderRadius:8, border:'1px solid rgba(10,37,64,0.08)'}} onError={e => e.target.style.display='none'}/>}
                 </div>
                 <div>
-                  <label className="form-label">추가 이미지 (최대 4장)</label>
-                  {[0,1,2,3].map(i => (
+                  <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8}}>
+                    <label className="form-label" style={{margin:0}}>추가 이미지 (최대 4장)</label>
+                    {(f.extraImages||[]).filter(Boolean).length < 4 && (
+                      <label style={{cursor:'pointer', fontSize:12, fontWeight:700, color:'var(--accent)', display:'flex', alignItems:'center', gap:4}}>
+                        <Icon name="plus" size={12}/>업로드 추가
+                        <input type="file" accept="image/*" style={{display:'none'}} onChange={async e => {
+                          const file = e.target.files?.[0]; if (!file) return;
+                          try {
+                            const url = await WW.uploadAsset('workwear-assets', file);
+                            setF(p => { const imgs = [...(p.extraImages||[])].filter(Boolean); imgs.push(url); return {...p, extraImages:imgs}; });
+                          } catch(err) { alert('업로드 실패: ' + err.message); }
+                          e.target.value = '';
+                        }}/>
+                      </label>
+                    )}
+                  </div>
+                  {(f.extraImages||[]).filter(Boolean).length === 0 && (
+                    <div style={{fontSize:12, color:'var(--fg-3)', fontFamily:'var(--font-primary)', padding:'6px 0'}}>추가 이미지 없음 — 위 버튼으로 업로드</div>
+                  )}
+                  {(f.extraImages||[]).map((url, i) => url ? (
                     <div key={i} style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
-                      <input className="form-input" value={(f.extraImages||[])[i]||''} onChange={e => { const imgs=[...(f.extraImages||[])]; imgs[i]=e.target.value; setF(p=>({...p,extraImages:imgs})); }} placeholder={`추가 이미지 ${i+1} URL`} style={{flex:1}}/>
-                      {(f.extraImages||[])[i] && <img src={(f.extraImages||[])[i]} alt="" style={{height:36,width:36,objectFit:'contain',borderRadius:6,border:'1px solid rgba(10,37,64,0.08)',flexShrink:0}} onError={e=>e.target.style.display='none'}/>}
+                      <img src={url} alt="" style={{height:36,width:36,objectFit:'contain',borderRadius:6,border:'1px solid rgba(10,37,64,0.08)',flexShrink:0}} onError={e=>e.target.style.display='none'}/>
+                      <input className="form-input" value={url} readOnly style={{flex:1, fontSize:11, color:'var(--fg-3)'}}/>
+                      <button type="button" onClick={() => setF(p => ({...p, extraImages:(p.extraImages||[]).filter((_,j)=>j!==i)}))} style={{flexShrink:0, width:28, height:28, borderRadius:8, border:'none', background:'rgba(226,55,68,0.08)', color:'var(--err)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center'}}><Icon name="x" size={12}/></button>
                     </div>
-                  ))}
+                  ) : null)}
                 </div>
               </div>
               <div className="glass-card" style={{ display:'flex', flexDirection:'column', gap:12, borderRadius:16 }}>
@@ -1062,47 +1092,30 @@ function AdminOrderMgmt() {
 function AdminEmployeeMgmt() {
   const store = useStore();
   const [expanded, setExpanded] = React.useState(null);
-  const [inputs, setInputs] = React.useState({});
+  const [edits, setEdits] = React.useState({});
+  const [saving, setSaving] = React.useState(null);
   const [flash, setFlash] = React.useState(null);
-  const [selected, setSelected] = React.useState(new Set());
-  const [bulkAmount, setBulkAmount] = React.useState('');
-  const [bulkNote, setBulkNote] = React.useState('');
-  const [bulkLoading, setBulkLoading] = React.useState(false);
   const PF = "var(--font-sans)";
   const SC = { pending:{label:'승인대기',bg:'#FFFBEB',color:'#92400E',border:'#FDE68A'}, approved:{label:'승인됨',bg:'#EFF6FF',color:'#1E40AF',border:'#BFDBFE'}, shipped:{label:'배송중',bg:'#F0FDF4',color:'#166534',border:'#BBF7D0'}, delivered:{label:'수령완료',bg:'#F9FAFB',color:'#6B7280',border:'#E5E7EB'}, rejected:{label:'반려됨',bg:'#FEF2F2',color:'#991B1B',border:'#FECACA'} };
 
-  const allChecked = store.employees.length > 0 && store.employees.every(e => selected.has(e.id));
-  function toggleSel(id) { setSelected(prev => { const n=new Set(prev); n.has(id)?n.delete(id):n.add(id); return n; }); }
-  function setInput(id, k, v) { setInputs(p => ({...p, [id]:{...p[id],[k]:v}})); }
-
-  async function adjust(emp, type) {
-    const amt = parseInt((inputs[emp.id]||{}).amount);
-    if (!amt) return;
-    const delta = type==='add' ? amt : -amt;
-    const prev = store.employees;
-    store.employees = store.employees.map(e => e.id===emp.id ? {...e, pts: Math.max(0, e.pts+delta), total_used: type==='sub' ? e.total_used+amt : e.total_used} : e);
-    store.pub();
-    try { await WW.grantPoints(emp.id, delta, (inputs[emp.id]||{}).note || null); }
-    catch(e) { alert(e.message||'포인트 조정 실패'); store.employees = prev; store.pub(); return; }
-    setInputs(p => ({...p, [emp.id]:{amount:'',note:''}}));
-    setFlash(emp.id); setTimeout(() => setFlash(null), 1600);
+  function startEdit(emp) {
+    setEdits(p => ({ ...p, [emp.id]: { dept: emp.dept||'', position: emp.position||'', name: emp.name||'' } }));
   }
+  function setEdit(id, k, v) { setEdits(p => ({...p, [id]:{...p[id],[k]:v}})); }
 
-  async function bulkGrant() {
-    const amt = parseInt(bulkAmount);
-    if (!amt || amt <= 0) return;
-    setBulkLoading(true);
-    const ids = [...selected];
-    const prev = store.employees;
-    store.employees = store.employees.map(e => ids.includes(e.id) ? {...e, pts: e.pts+amt} : e);
-    store.pub();
+  async function saveProfile(emp) {
+    const e = edits[emp.id];
+    if (!e) return;
+    setSaving(emp.id);
     try {
-      await Promise.all(ids.map(id => WW.grantPoints(id, amt, bulkNote || null)));
-      await WW.bootstrap();
-      setBulkAmount(''); setBulkNote(''); setSelected(new Set());
-    } catch(e) {
-      alert(e.message||'일괄 지급 실패'); store.employees = prev; store.pub();
-    } finally { setBulkLoading(false); }
+      await WW.updateProfile(emp.id, { department: e.dept, position: e.position, full_name: e.name });
+      store.employees = store.employees.map(x => x.id===emp.id ? {...x, dept:e.dept, position:e.position, name:e.name} : x);
+      store.pub();
+      setFlash(emp.id); setTimeout(() => setFlash(null), 1800);
+      setEdits(p => { const n={...p}; delete n[emp.id]; return n; });
+    } catch(err) {
+      alert(err.message || '저장 실패');
+    } finally { setSaving(null); }
   }
 
   async function deleteEmployee(emp) {
@@ -1111,49 +1124,35 @@ function AdminEmployeeMgmt() {
       if (WW?.deleteUser) await WW.deleteUser(emp.id);
       await WW.bootstrap();
     } catch(e) {
-      store.employees = store.employees.filter(e => e.id !== emp.id);
+      store.employees = store.employees.filter(x => x.id !== emp.id);
       store.pub();
     }
   }
 
   return (
     <div className="content">
-      {selected.size > 0 && (
-        <div style={{ padding:'14px 18px', borderRadius:14, background:'linear-gradient(135deg,rgba(47,128,237,0.08),rgba(47,128,237,0.04))', border:'1px solid rgba(47,128,237,0.2)', display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
-          <span style={{ fontSize:13, fontWeight:700, color:'var(--accent)', fontFamily:PF, whiteSpace:'nowrap' }}>{selected.size}명 선택됨</span>
-          <input className="form-input" type="number" min="1" placeholder="지급 포인트" value={bulkAmount} onChange={e => setBulkAmount(e.target.value)} style={{ width:130, height:38 }}/>
-          <input className="form-input" placeholder="사유 (선택)" value={bulkNote} onChange={e => setBulkNote(e.target.value)} style={{ flex:1, minWidth:100, maxWidth:220, height:38 }}/>
-          <button className="btn btn-primary" onClick={bulkGrant} disabled={!bulkAmount||bulkLoading} style={{ height:38, whiteSpace:'nowrap' }}>
-            <Icon name="points"/> {bulkLoading?'처리 중...':`${selected.size}명 일괄 지급`}
-          </button>
-          <button className="btn btn-secondary btn-sm" onClick={() => setSelected(new Set())}>선택 해제</button>
-        </div>
-      )}
       <div className="glass-card" style={{ padding:0, overflow:'hidden' }}>
-        <div style={{ padding:'16px 20px', borderBottom:'1px solid var(--border-hairline-2)', display:'flex', alignItems:'center', gap:14 }}>
-          <input type="checkbox" checked={allChecked} onChange={() => setSelected(allChecked ? new Set() : new Set(store.employees.map(e=>e.id)))} style={{ cursor:'pointer', width:16, height:16 }}/>
+        <div style={{ padding:'16px 20px', borderBottom:'1px solid var(--border-hairline-2)' }}>
           <span style={{ fontFamily:'var(--font-display)', fontWeight:600, fontSize:16, color:'var(--fg-1)' }}>직원 목록 ({store.employees.length}명)</span>
         </div>
         {store.employees.map(emp => {
           const isExp = expanded===emp.id;
           const orders = store.orders.filter(o => o.emp===emp.name);
-          const inp = inputs[emp.id] || { amount:'', note:'' };
+          const ed = edits[emp.id];
+          const isEditing = !!ed;
           return (
             <div key={emp.id} style={{ borderBottom:'1px solid var(--border-hairline-2)' }}>
-              <div style={{ display:'grid', gridTemplateColumns:'44px 1fr 1fr 120px 120px 80px 44px', gap:12, padding:'14px 20px', alignItems:'center' }}
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 110px 80px 60px 44px', gap:12, padding:'14px 20px', alignItems:'center' }}
                 onMouseEnter={e => e.currentTarget.style.background='rgba(47,128,237,0.03)'}
                 onMouseLeave={e => e.currentTarget.style.background=''}>
-                <div onClick={e => e.stopPropagation()} style={{ display:'flex', justifyContent:'center' }}>
-                  <input type="checkbox" checked={selected.has(emp.id)} onChange={() => toggleSel(emp.id)} style={{ cursor:'pointer', width:16, height:16 }}/>
-                </div>
-                <div onClick={() => setExpanded(isExp ? null : emp.id)} style={{ cursor:'pointer' }}>
+                <div onClick={() => { setExpanded(isExp ? null : emp.id); if (!isExp) startEdit(emp); }} style={{ cursor:'pointer' }}>
                   <div style={{ fontWeight:600, fontSize:14, color:'var(--fg-1)' }}>{emp.name}</div>
-                  <div style={{ fontSize:12, color:'var(--fg-3)', marginTop:2 }}>{emp.position} · {emp.dept}</div>
+                  <div style={{ fontSize:12, color:'var(--fg-3)', marginTop:2 }}>{emp.position||'—'} · {emp.dept||'—'}</div>
                 </div>
-                <div style={{ fontSize:12, color:'var(--fg-3)', fontFamily:PF, cursor:'pointer' }} onClick={() => setExpanded(isExp ? null : emp.id)}>가입 {emp.joinDate}</div>
-                <div style={{ fontFamily:'var(--font-display)', fontWeight:700, color:'var(--accent)', fontSize:15, cursor:'pointer' }} onClick={() => setExpanded(isExp ? null : emp.id)}>{fmtPts(emp.pts)}P</div>
-                <div style={{ fontSize:13, color:'var(--fg-3)', cursor:'pointer' }} onClick={() => setExpanded(isExp ? null : emp.id)}>사용 {fmtPts(emp.total_used)}P</div>
-                <div style={{ display:'flex', justifyContent:'flex-end', alignItems:'center', gap:8, cursor:'pointer' }} onClick={() => setExpanded(isExp ? null : emp.id)}>
+                <div style={{ fontSize:12, color:'var(--fg-3)', fontFamily:PF, cursor:'pointer' }} onClick={() => { setExpanded(isExp ? null : emp.id); if (!isExp) startEdit(emp); }}>가입 {emp.joinDate}</div>
+                <div style={{ fontFamily:'var(--font-display)', fontWeight:700, color:'var(--accent)', fontSize:14 }}>{fmtPts(emp.pts)}P</div>
+                <div style={{ fontSize:12, color:'var(--fg-3)', fontFamily:PF }}>사용 {fmtPts(emp.total_used)}P</div>
+                <div style={{ display:'flex', justifyContent:'flex-end', alignItems:'center', gap:6, cursor:'pointer' }} onClick={() => { setExpanded(isExp ? null : emp.id); if (!isExp) startEdit(emp); }}>
                   <span style={{ fontSize:12, color:'var(--fg-3)', fontFamily:PF }}>{orders.length}건</span>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--fg-3)" strokeWidth="2" strokeLinecap="round" style={{ transform: isExp?'rotate(180deg)':'rotate(0)', transition:'transform 200ms' }}><polyline points="6 9 12 15 18 9"/></svg>
                 </div>
@@ -1183,21 +1182,33 @@ function AdminEmployeeMgmt() {
                       </div>
                     )}
                   </div>
-                  {/* 포인트 조정 */}
+                  {/* 프로필 수정 */}
                   <div style={{ background:'rgba(255,255,255,0.75)', borderRadius:14, border:'1px solid rgba(255,255,255,0.65)', padding:'16px 18px', boxShadow:'0 2px 8px rgba(10,37,64,0.04)' }}>
-                    <div style={{ fontSize:13, fontWeight:700, color:'var(--fg-1)', marginBottom:14 }}>포인트 수동 조정</div>
+                    <div style={{ fontSize:13, fontWeight:700, color:'var(--fg-1)', marginBottom:14 }}>프로필 수정</div>
                     {flash===emp.id ? (
-                      <div style={{ textAlign:'center', padding:'20px 0', color:'var(--ok)', fontWeight:600, fontSize:14 }}>✓ 처리됐어요</div>
-                    ) : (
+                      <div style={{ textAlign:'center', padding:'20px 0', color:'var(--ok)', fontWeight:600, fontSize:14 }}>✓ 저장됐어요</div>
+                    ) : isEditing ? (
                       <>
-                        <div style={{ marginBottom:10 }}><label className="form-label">조정 포인트</label><input className="form-input" type="number" placeholder="예: 5000" value={inp.amount} onChange={e => setInput(emp.id,'amount',e.target.value)}/></div>
-                        <div style={{ marginBottom:14 }}><label className="form-label">사유</label><input className="form-input" placeholder="조정 사유" value={inp.note||''} onChange={e => setInput(emp.id,'note',e.target.value)}/></div>
+                        <div style={{ marginBottom:10 }}>
+                          <label className="form-label">이름</label>
+                          <input className="form-input" value={ed.name} onChange={e => setEdit(emp.id,'name',e.target.value)}/>
+                        </div>
+                        <div style={{ marginBottom:10 }}>
+                          <label className="form-label">부서</label>
+                          <input className="form-input" placeholder="예: 생산 1팀" value={ed.dept} onChange={e => setEdit(emp.id,'dept',e.target.value)}/>
+                        </div>
+                        <div style={{ marginBottom:14 }}>
+                          <label className="form-label">직급</label>
+                          <input className="form-input" placeholder="예: 주임" value={ed.position} onChange={e => setEdit(emp.id,'position',e.target.value)}/>
+                        </div>
                         <div style={{ display:'flex', gap:8 }}>
-                          <button className="btn btn-primary" style={{ flex:1 }} onClick={() => adjust(emp,'add')} disabled={!inp.amount}><Icon name="plus"/> 지급</button>
-                          <button className="btn btn-danger" style={{ flex:1 }} onClick={() => adjust(emp,'sub')} disabled={!inp.amount}><Icon name="x"/> 차감</button>
+                          <button className="btn btn-primary" style={{ flex:1 }} onClick={() => saveProfile(emp)} disabled={saving===emp.id}>
+                            {saving===emp.id ? '저장 중...' : '저장'}
+                          </button>
+                          <button className="btn btn-secondary" onClick={() => setEdits(p => { const n={...p}; delete n[emp.id]; return n; })}>취소</button>
                         </div>
                       </>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               )}

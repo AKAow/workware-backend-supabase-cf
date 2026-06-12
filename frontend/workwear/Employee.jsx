@@ -332,14 +332,9 @@ function ProductDetail({ product, setScreen, setSelectedProduct, cart, setCart, 
   const selectedStock = selectedColor && product.stockByColorSize ? product.stockByColorSize[selectedColor.id] || {} : product.stock;
   const canAddToCart = (!needsColor || selectedColor) && !!size;
 
-  // 더미 썸네일 (동일 이모지 각도 변형 표현)
-  const thumbs = [
-    { bg:'#f0f0f0', label:'정면' },
-    { bg:'#e8e8e8', label:'측면' },
-    { bg:'#ececec', label:'후면' },
-    { bg:'#f4f4f4', label:'디테일' },
-    { bg:'#efefef', label:'착용' },
-  ];
+  // 실제 상품 이미지로 갤러리 구성 (메인 + 추가 이미지)
+  const galleryImages = [product.imageUrl, ...(product.extraImages||[])].filter(Boolean);
+  const activeImage = galleryImages[activeThumb] || null;
   const recommendations = store.products.filter(p => p.active && p.id !== product.id).slice(0, 3);
 
   function addToCart() {
@@ -391,18 +386,22 @@ function ProductDetail({ product, setScreen, setSelectedProduct, cart, setCart, 
 
         {/* 좌측 세로 썸네일 */}
         <div style={{display:'flex', flexDirection:'column', gap:8, paddingRight:12}}>
-          {thumbs.map((t,i)=>(
-            <div key={i} onMouseEnter={()=>setActiveThumb(i)}
+          {galleryImages.length > 0 ? galleryImages.map((imgUrl, i) => (
+            <div key={i} onClick={()=>setActiveThumb(i)}
               style={{
-                width:46, height:56, borderRadius:4, background:t.bg,
+                width:46, height:56, borderRadius:4, background:'#f0f0f0',
                 display:'flex', alignItems:'center', justifyContent:'center',
-                fontSize:20, cursor:'pointer',
+                fontSize:20, cursor:'pointer', overflow:'hidden',
                 border: activeThumb===i ? '1.5px solid #111' : '1.5px solid transparent',
                 transition:'border-color 120ms',
               }}>
-              <span style={{opacity: activeThumb===i ? 1 : 0.6}}>{product.thumb}</span>
+              <img src={imgUrl} alt="" style={{width:'100%', height:'100%', objectFit:'cover', opacity: activeThumb===i ? 1 : 0.6}} onError={e=>e.target.style.display='none'}/>
             </div>
-          ))}
+          )) : (
+            <div style={{width:46, height:56, borderRadius:4, background:'#f0f0f0', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20}}>
+              {product.thumb}
+            </div>
+          )}
         </div>
 
         {/* 메인 이미지 */}
@@ -413,8 +412,8 @@ function ProductDetail({ product, setScreen, setSelectedProduct, cart, setCart, 
           position:'relative',
           alignSelf:'start',
         }}>
-          {product.imageUrl
-            ? <img src={product.imageUrl} alt={product.name} style={{maxWidth:'72%', maxHeight:'72%', objectFit:'contain', filter:'drop-shadow(0 12px 32px rgba(0,0,0,0.12))'}}/>
+          {activeImage
+            ? <img src={activeImage} alt={product.name} style={{maxWidth:'72%', maxHeight:'72%', objectFit:'contain', filter:'drop-shadow(0 12px 32px rgba(0,0,0,0.12))'}}/>
             : <span style={{filter:'drop-shadow(0 12px 32px rgba(0,0,0,0.12))'}}>{product.thumb}</span>}
           {product.tag==='인기' && (
             <span style={{position:'absolute',top:20,left:20,fontSize:11,fontWeight:600,color:'var(--accent-600)',background:'var(--accent-050)',border:'1px solid var(--accent-200)',borderRadius:9999,padding:'3px 10px',fontFamily:NKF}}>인기</span>

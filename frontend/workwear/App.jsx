@@ -126,11 +126,15 @@ function App() {
               100% { background-position: 0% 50%; }
             }
           `}</style>
-          {/* 애니메이션 그라디언트 배경 */}
+          {/* 배경 영상 — Supabase Storage 업로드 후 URL 반영됨 */}
+          <video autoPlay loop muted playsInline style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', opacity:0.45 }}>
+            <source src="https://deylxtdxkiitaunlogjk.supabase.co/storage/v1/object/public/workwear-assets/login-bg.mp4" type="video/mp4"/>
+          </video>
+          {/* 영상 없을 때 폴백 그라디언트 */}
           <div style={{ position:'absolute', inset:0, background:'linear-gradient(-45deg,#0a0f1a,#0f2044,#0a2a1a,#1a0a2a)', backgroundSize:'400% 400%', animation:'gradShift 12s ease infinite' }}/>
           {/* 격자 텍스처 오버레이 */}
           <div style={{ position:'absolute', inset:0, backgroundImage:'linear-gradient(rgba(255,255,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.03) 1px,transparent 1px)', backgroundSize:'40px 40px' }}/>
-          <div style={{ position:'absolute', inset:0, background:'linear-gradient(135deg, rgba(10,15,26,0.4) 0%, transparent 60%)' }}/>
+          <div style={{ position:'absolute', inset:0, background:'linear-gradient(135deg, rgba(10,15,26,0.6) 0%, rgba(10,15,26,0.2) 100%)' }}/>
           <div style={{ position:'relative', height:'100%', display:'flex', flexDirection:'column', justifyContent:'space-between', padding:'48px 52px' }}>
             <div>
               <img src="logo-white.png" alt="WindTree" style={{ height:36, objectFit:'contain' }}/>
