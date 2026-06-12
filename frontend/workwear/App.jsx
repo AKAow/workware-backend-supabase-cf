@@ -109,9 +109,8 @@ function App() {
           <div style={{ position:'absolute', inset:0, backgroundImage:'linear-gradient(rgba(255,255,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.03) 1px,transparent 1px)', backgroundSize:'40px 40px' }}/>
           <div style={{ position:'absolute', inset:0, background:'linear-gradient(135deg, rgba(10,15,26,0.4) 0%, transparent 60%)' }}/>
           <div style={{ position:'relative', height:'100%', display:'flex', flexDirection:'column', justifyContent:'space-between', padding:'48px 52px' }}>
-            <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-              <div style={{ width:36, height:36, borderRadius:10, background:'rgba(255,255,255,0.15)', backdropFilter:'blur(8px)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18 }}>🦺</div>
-              <span style={{ color:'#fff', fontWeight:800, fontSize:18, letterSpacing:'-0.02em' }}>WindTree</span>
+            <div>
+              <img src="logo-white.png" alt="WindTree" style={{ height:36, objectFit:'contain' }}/>
             </div>
             <div>
               <div style={{ fontSize:'clamp(28px,3.5vw,44px)', fontWeight:900, color:'#fff', lineHeight:1.15, letterSpacing:'-0.03em', marginBottom:16 }}>
