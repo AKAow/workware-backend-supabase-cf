@@ -10,7 +10,7 @@ function AdminDashboard({ setScreen }) {
   return (
     <div className="content">
       <div className="kpi-row kpi-col-4">
-        <div className="kpi-card" style={{cursor:'pointer'}} onClick={()=>setScreen('admin-orders')}>
+        <div className="kpi-card" style={{cursor:'pointer'}} onClick={()=>setScreen('admin-order-mgmt')}>
           <div className="kpi-label">승인 대기</div>
           <div className="kpi-value" style={{color: pending>0?'var(--err)':'var(--fg-1)'}}>{pending}</div>
           <div className="kpi-delta" style={{color:'var(--fg-3)', fontSize:12, fontFamily:'var(--font-sans)'}}>클릭하여 처리</div>
@@ -34,7 +34,7 @@ function AdminDashboard({ setScreen }) {
       <div className="glass-card">
         <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14}}>
           <span style={{fontFamily:'var(--font-display)', fontWeight:600, fontSize:16, color:'var(--fg-1)'}}>최근 주문 현황</span>
-          <button className="btn btn-secondary btn-sm" onClick={()=>setScreen('admin-orders')}>전체 처리 →</button>
+          <button className="btn btn-secondary btn-sm" onClick={()=>setScreen('admin-order-mgmt')}>전체 처리 →</button>
         </div>
         <table className="ww-table">
           <thead><tr><th>주문번호</th><th>직원</th><th>부서</th><th>상품</th><th>포인트</th><th>상태</th><th>날짜</th></tr></thead>
@@ -1007,8 +1007,17 @@ function AdminOrderMgmt() {
   const pendingSelected = [...selected].filter(id => store.orders.find(o=>o.id===id)?.status==='pending').length;
   const allChecked = filtered.length > 0 && filtered.every(o => selected.has(o.id));
 
+  const pendingCount = store.orders.filter(o=>o.status==='pending').length;
   return (
     <div className="content">
+      {pendingCount > 0 && (
+        <div style={{padding:'12px 16px', borderRadius:14, background:'rgba(232,161,60,0.12)', border:'1px solid var(--warn-050)', display:'flex', alignItems:'center', gap:12}}>
+          <Icon name="alert" size={18} color="var(--warn)"/>
+          <span style={{fontFamily:'var(--font-sans)', fontSize:13, color:'var(--fg-1)'}}>
+            <strong>{pendingCount}건</strong>의 주문이 승인을 기다리고 있어요.
+          </span>
+        </div>
+      )}
       <div style={{ display:'flex', gap:12, alignItems:'center', flexWrap:'wrap' }}>
         <div className="seg">
           {Object.keys(LABELS).map(s => <button key={s} className={filter===s?'active':''} onClick={() => { setFilter(s); setSelected(new Set()); }}>{LABELS[s]}</button>)}

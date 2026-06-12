@@ -359,13 +359,11 @@ function Sidebar({ role, canAdmin = false, setRole, screen, setScreen, openCart,
   ];
   const adminNav = [
     { id:'admin-dashboard',  label:'대시보드',   icon:'gauge' },
-    { id:'admin-orders',     label:'주문 승인',   icon:'approve', dynamicBadge: pendingOrderCount > 0 ? String(pendingOrderCount) : null },
-    { id:'admin-points',     label:'포인트 지급', icon:'points' },
+    { id:'admin-order-mgmt', label:'주문 관리',   icon:'approve', dynamicBadge: pendingOrderCount > 0 ? String(pendingOrderCount) : null },
     { id:'admin-inventory',  label:'재고 관리',   icon:'inventory' },
     { type:'section', label:'관리 시스템' },
     { id:'admin-products',   label:'상품 관리',   icon:'catalog' },
     { id:'admin-banners',    label:'배너 관리',   icon:'banner' },
-    { id:'admin-order-mgmt', label:'주문 관리',   icon:'truck' },
     { id:'admin-employees',  label:'직원 관리',   icon:'users' },
   ];
   const nav = role === 'employee' ? empNav : adminNav;
