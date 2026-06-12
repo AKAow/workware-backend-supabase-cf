@@ -118,7 +118,7 @@ function App() {
     return (
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', minHeight:'100vh', fontFamily:'var(--font-display)' }}>
         {/* 좌측 — 영상 패널 (VIDEO_URL 변수에 mp4 URL 지정 시 영상 재생) */}
-        <div style={{ position:'relative', overflow:'hidden', background:'#0a0f1a' }}>
+        <div style={{ position:'relative', overflow:'hidden', background:'#0a2540' }}>
           <style>{`
             @keyframes gradShift {
               0%   { background-position: 0% 50%; }
@@ -127,7 +127,7 @@ function App() {
             }
           `}</style>
           {/* 폴백 그라디언트 (맨 아래 — 영상 로드 실패 시 표시) */}
-          <div style={{ position:'absolute', inset:0, background:'linear-gradient(-45deg,#0a0f1a,#0f2044,#0a2a1a,#1a0a2a)', backgroundSize:'400% 400%', animation:'gradShift 12s ease infinite' }}/>
+          <div style={{ position:'absolute', inset:0, background:'linear-gradient(-45deg,#042C44,#0a2540,#0d1e35,#042C44)', backgroundSize:'400% 400%', animation:'gradShift 12s ease infinite' }}/>
           {/* 배경 영상 (그라디언트 위) */}
           <video autoPlay loop muted playsInline style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover' }}>
             <source src="https://deylxtdxkiitaunlogjk.supabase.co/storage/v1/object/public/workwear-assets/login-bg.mp4" type="video/mp4"/>
@@ -135,7 +135,7 @@ function App() {
           {/* 격자 텍스처 오버레이 */}
           <div style={{ position:'absolute', inset:0, backgroundImage:'linear-gradient(rgba(255,255,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.03) 1px,transparent 1px)', backgroundSize:'40px 40px' }}/>
           {/* 다크 오버레이 — 영상 위 텍스트 가독성 확보 */}
-          <div style={{ position:'absolute', inset:0, background:'rgba(10,15,26,0.52)' }}/>
+          <div style={{ position:'absolute', inset:0, background:'linear-gradient(160deg, rgba(4,44,68,0.62) 0%, rgba(10,37,64,0.38) 100%)' }}/>
           <div style={{ position:'relative', height:'100%', display:'flex', flexDirection:'column', justifyContent:'space-between', padding:'48px 52px' }}>
             <div>
               <img src="logo-white.png" alt="WindTree" style={{ height:36, objectFit:'contain' }}/>
@@ -152,10 +152,10 @@ function App() {
         </div>
 
         {/* 우측 — 로그인 패널 */}
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'center', background:'#f8fafc', padding:'48px 40px' }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(145deg,#f0f7ff 0%,#e8f2fb 100%)', padding:'48px 40px' }}>
           <div style={{ width:'100%', maxWidth:400 }}>
             <div style={{ marginBottom:36 }}>
-              <h1 style={{ fontSize:28, fontWeight:900, color:'#0a0f1a', letterSpacing:'-0.03em', margin:'0 0 8px' }}>
+              <h1 style={{ fontSize:28, fontWeight:900, color:'#0a2540', letterSpacing:'-0.03em', margin:'0 0 8px' }}>
                 {resetMode ? '비밀번호 재설정' : '로그인'}
               </h1>
               <p style={{ fontSize:14, color:'#64748b', margin:0 }}>
@@ -167,7 +167,7 @@ function App() {
               resetSent ? (
                 <div style={{ textAlign:'center', padding:'32px 0' }}>
                   <div style={{ fontSize:40, marginBottom:16 }}>📬</div>
-                  <div style={{ fontSize:16, fontWeight:700, color:'#0a0f1a', marginBottom:8 }}>이메일을 확인해주세요</div>
+                  <div style={{ fontSize:16, fontWeight:700, color:'#0a2540', marginBottom:8 }}>이메일을 확인해주세요</div>
                   <div style={{ fontSize:14, color:'#64748b', marginBottom:24 }}>{email} 으로 재설정 링크를 발송했습니다</div>
                   <button onClick={() => { setResetMode(false); setResetSent(false); setError(''); }}
                     style={{ fontSize:14, color:'#2f80ed', background:'none', border:'none', cursor:'pointer', fontWeight:600 }}>
@@ -184,7 +184,7 @@ function App() {
                   </div>
                   {error && <div style={{ padding:'10px 14px', borderRadius:10, background:'rgba(226,55,68,0.07)', border:'1px solid rgba(226,55,68,0.2)', fontSize:13, color:'var(--err)' }}>⚠ {error}</div>}
                   <button onClick={doReset} disabled={resetLoading}
-                    style={{ marginTop:4, width:'100%', height:50, borderRadius:12, border:'none', background: resetLoading ? '#64748b' : '#0a0f1a', color:'#fff', fontSize:15, fontWeight:700, cursor: resetLoading ? 'not-allowed' : 'pointer', transition:'opacity 150ms' }}
+                    style={{ marginTop:4, width:'100%', height:50, borderRadius:12, border:'none', background: resetLoading ? '#64748b' : '#0a2540', color:'#fff', fontSize:15, fontWeight:700, cursor: resetLoading ? 'not-allowed' : 'pointer', transition:'opacity 150ms' }}
                     onMouseOver={e => { if (!resetLoading) e.currentTarget.style.opacity='0.85'; }} onMouseOut={e => e.currentTarget.style.opacity='1'}>
                     {resetLoading ? '전송 중...' : '재설정 링크 보내기'}
                   </button>
@@ -216,7 +216,7 @@ function App() {
                 </div>
                 {error && <div style={{ padding:'10px 14px', borderRadius:10, background:'rgba(226,55,68,0.07)', border:'1px solid rgba(226,55,68,0.2)', fontSize:13, color:'var(--err)' }}>⚠ {error}</div>}
                 <button onClick={doLogin}
-                  style={{ marginTop:4, width:'100%', height:50, borderRadius:12, border:'none', background:'#0a0f1a', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer', letterSpacing:'-0.01em', transition:'opacity 150ms' }}
+                  style={{ marginTop:4, width:'100%', height:50, borderRadius:12, border:'none', background:'#0a2540', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer', letterSpacing:'-0.01em', transition:'opacity 150ms' }}
                   onMouseOver={e => e.currentTarget.style.opacity='0.85'} onMouseOut={e => e.currentTarget.style.opacity='1'}>
                   로그인
                 </button>
