@@ -56,7 +56,7 @@ function App() {
     try {
       setError('');
       await WW.client.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.origin,
+        redirectTo: 'https://workwear.windtreeeng.com',
       });
       setResetSent(true);
     } catch (e) {
