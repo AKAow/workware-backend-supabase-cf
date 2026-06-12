@@ -105,7 +105,7 @@ function App() {
       case 'admin-dashboard': return <AdminDashboard setScreen={setScreen} />;
       case 'admin-orders': return <AdminOrders />;
       case 'admin-points': return <AdminPoints />;
-      case 'admin-inventory': return <AdminInventory />;
+      case 'admin-inventory': return <AdminInventory setScreen={setScreen} />;
       case 'admin-products': return <AdminProductMgmt />;
       case 'admin-banners': return <AdminBannerMgmt />;
       case 'admin-order-mgmt': return <AdminOrderMgmt />;

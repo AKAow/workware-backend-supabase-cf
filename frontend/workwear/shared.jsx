@@ -211,6 +211,7 @@ const WW = {
   approveOrder: (id) => wwApi(`/orders/${id}/approve`, { method: 'POST' }),
   rejectOrder: (id, reason) => wwApi(`/orders/${id}/reject`, { method: 'POST', body: JSON.stringify({ reason }) }),
   grantPoints: (user_id, amount, note) => wwApi('/points/grant', { method: 'POST', body: JSON.stringify({ user_id, amount, note }) }),
+  deleteUser: (id) => wwApi(`/admin/users/${id}`, { method: 'DELETE' }),
   async bootstrap() {
     if (!WW_SUPABASE) return;
     const { data } = await WW_SUPABASE.auth.getUser();

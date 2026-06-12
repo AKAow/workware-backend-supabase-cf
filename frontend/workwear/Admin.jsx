@@ -83,9 +83,26 @@ function AdminDashboard({ setScreen }) {
 function AdminOrders() {
   const store = useStore();
   const [filter, setFilter] = useAdmin('pending');
+  const [processing, setProcessing] = useAdmin(new Set());
 
-  async function approve(id) { await WW.approveOrder(id); await WW.bootstrap(); }
-  async function reject(id)  { await WW.rejectOrder(id, 'admin rejected'); await WW.bootstrap(); }
+  async function approve(id) {
+    setProcessing(p => new Set(p).add(id));
+    const prev = store.orders;
+    store.orders = store.orders.map(o => o.id===id ? {...o, status:'approved'} : o);
+    store.pub();
+    try { await WW.approveOrder(id); await WW.bootstrap(); }
+    catch(e) { alert(e.message||'승인 실패'); store.orders = prev; store.pub(); }
+    finally { setProcessing(p => { const n=new Set(p); n.delete(id); return n; }); }
+  }
+  async function reject(id) {
+    setProcessing(p => new Set(p).add(id));
+    const prev = store.orders;
+    store.orders = store.orders.map(o => o.id===id ? {...o, status:'rejected'} : o);
+    store.pub();
+    try { await WW.rejectOrder(id, '관리자 반려'); await WW.bootstrap(); }
+    catch(e) { alert(e.message||'반려 실패'); store.orders = prev; store.pub(); }
+    finally { setProcessing(p => { const n=new Set(p); n.delete(id); return n; }); }
+  }
 
   const filtered = filter==='전체' ? store.orders : store.orders.filter(o=>o.status===filter);
   const pending = store.orders.filter(o=>o.status==='pending').length;
@@ -125,8 +142,8 @@ function AdminOrders() {
                 <td>
                   {o.status==='pending' ? (
                     <div style={{display:'flex',gap:6,justifyContent:'center'}}>
-                      <button className="btn btn-ok btn-sm" onClick={()=>approve(o.id)}>승인</button>
-                      <button className="btn btn-danger btn-sm" onClick={()=>reject(o.id)}>반려</button>
+                      <button className="btn btn-ok btn-sm" disabled={processing.has(o.id)} onClick={()=>approve(o.id)}>{processing.has(o.id)?'…':'승인'}</button>
+                      <button className="btn btn-danger btn-sm" disabled={processing.has(o.id)} onClick={()=>reject(o.id)}>{processing.has(o.id)?'…':'반려'}</button>
                     </div>
                   ) : <span style={{fontSize:12,color:'var(--fg-4)',display:'block',textAlign:'center'}}>—</span>}
                 </td>
@@ -147,15 +164,21 @@ function AdminPoints() {
   const [amount, setAmount] = useAdmin('');
   const [note, setNote] = useAdmin('');
   const [done, setDone] = useAdmin(false);
+  const [ptError, setPtError] = useAdmin('');
 
   const employees = store.employees;
 
   async function givePoints() {
     if (!sel || !amount) return;
-    await WW.grantPoints(sel, parseInt(amount, 10), note || null);
-    await WW.bootstrap();
-    setDone(true);
-    setTimeout(()=>{setDone(false);setSel(null);setAmount('');setNote('');},1800);
+    setPtError('');
+    try {
+      await WW.grantPoints(sel, parseInt(amount, 10), note || null);
+      await WW.bootstrap();
+      setDone(true);
+      setTimeout(()=>{setDone(false);setSel(null);setAmount('');setNote('');setPtError('');},1800);
+    } catch(e) {
+      setPtError(e.message || '포인트 지급에 실패했습니다.');
+    }
   }
 
   return (
@@ -220,6 +243,7 @@ function AdminPoints() {
                   지급 후 잔액: <strong style={{color:'var(--fg-1)'}}>{fmtPts((employees.find(e=>e.id===sel)?.pts||0)+parseInt(amount||0))}P</strong>
                 </div>
               )}
+              {ptError && <div style={{ padding:'10px 14px', borderRadius:10, background:'rgba(226,55,68,0.07)', border:'1px solid rgba(226,55,68,0.2)', fontSize:13, color:'var(--err)' }}>⚠ {ptError}</div>}
               <button className="btn btn-primary" style={{width:'100%'}} onClick={givePoints} disabled={!sel||!amount}>
                 <Icon name="points"/> 포인트 지급하기
               </button>
@@ -232,7 +256,7 @@ function AdminPoints() {
 }
 
 /* ---- 재고 관리 ---- */
-function AdminInventory() {
+function AdminInventory({ setScreen }) {
   const store = useStore();
   const [search, setSearch] = useAdmin('');
   const filtered = store.products.filter(p=>search===''||p.name.includes(search));
@@ -244,7 +268,7 @@ function AdminInventory() {
           <svg viewBox="0 0 24 24" style={{position:'absolute',left:12,top:'50%',transform:'translateY(-50%)'}}><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
           <input className="form-input" style={{paddingLeft:38}} placeholder="상품명 검색…" value={search} onChange={e=>setSearch(e.target.value)}/>
         </div>
-        <button className="btn btn-primary"><Icon name="plus"/> 상품 추가</button>
+        <button className="btn btn-primary" onClick={() => setScreen?.('admin-products')}><Icon name="plus"/> 상품 추가</button>
       </div>
       <div className="glass-card" style={{padding:0,overflow:'hidden'}}>
         <table className="ww-table">
@@ -303,7 +327,11 @@ function AdminBannerMgmt() {
     store.banners = isNew ? [...store.banners, form] : store.banners.map(b => b.id === form.id ? form : b);
     store.pub(); setForm(null);
   }
-  function deleteBanner(id) { store.banners = store.banners.filter(b => b.id !== id); store.pub(); }
+  function deleteBanner(id) {
+    if (!window.confirm('배너를 삭제하시겠습니까?')) return;
+    store.banners = store.banners.filter(b => b.id !== id);
+    store.pub();
+  }
   function toggleActive(id) { store.banners = store.banners.map(b => b.id === id ? { ...b, active: !b.active } : b); store.pub(); }
   function onDrop(e, toIdx) {
     e.preventDefault();
@@ -897,7 +925,7 @@ function AdminProductMgmt() {
           <svg viewBox="0 0 24 24" style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)' }}><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
           <input className="form-input" style={{ paddingLeft:38 }} placeholder="상품명 검색" value={search} onChange={e => setSearch(e.target.value)}/>
         </div>
-        <button className="btn btn-primary" onClick={() => setEditing(editProduct({ id:Date.now(), name:'', cat:'상의', pts:0, thumb:'📦', imageUrl:'', colors:[WORKWEAR_COLORS.black], sizes:['S','M','L','XL','2XL'], stock:{S:0,M:0,L:0,XL:0,'2XL':0}, tag:'', active:true, featured:false, desc:'', detailInfo:DEFAULT_DETAIL, shippingInfo:DEFAULT_SHIPPING, returnInfo:DEFAULT_RETURN }))}>
+        <button className="btn btn-primary" onClick={() => { setEditing(editProduct({ id:Date.now(), name:'', cat:'상의', pts:0, thumb:'📦', imageUrl:'', colors:[WORKWEAR_COLORS.black], sizes:['S','M','L','XL','2XL'], stock:{S:0,M:0,L:0,XL:0,'2XL':0}, tag:'', active:true, featured:false, desc:'', detailInfo:DEFAULT_DETAIL, shippingInfo:DEFAULT_SHIPPING, returnInfo:DEFAULT_RETURN })); setEditTab('basic'); }}>
           <Icon name="plus"/> 상품 추가
         </button>
       </div>
@@ -927,7 +955,7 @@ function AdminProductMgmt() {
                   <td><Toggle on={p.active} onChange={() => toggleActive(p.id)}/></td>
                   <td style={{ textAlign:'center' }}>
                     <div style={{ display:'flex', gap:6, justifyContent:'center' }}>
-                      <button className="btn btn-secondary btn-sm" onClick={() => setEditing(editProduct(p))}><Icon name="edit" size={13}/> 수정</button>
+                      <button className="btn btn-secondary btn-sm" onClick={() => { setEditing(editProduct(p)); setEditTab('basic'); }}><Icon name="edit" size={13}/> 수정</button>
                       <button className="btn btn-sm" onClick={() => deleteProduct(p.id)} style={{ background:'rgba(226,55,68,0.08)', color:'var(--err)', border:'1px solid rgba(226,55,68,0.2)' }}><Icon name="trash" size={13}/></button>
                     </div>
                   </td>
@@ -965,9 +993,15 @@ function AdminOrderMgmt() {
     }
   }
   function toggleSel(id) { setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; }); }
-  function bulkApprove() {
-    store.orders = store.orders.map(o => selected.has(o.id) && o.status==='pending' ? {...o, status:'approved'} : o);
-    store.pub(); setSelected(new Set());
+  async function bulkApprove() {
+    const pendingIds = [...selected].filter(id => store.orders.find(o=>o.id===id)?.status==='pending');
+    if (!pendingIds.length) { setSelected(new Set()); return; }
+    const prev = store.orders;
+    store.orders = store.orders.map(o => pendingIds.includes(o.id) ? {...o, status:'approved'} : o);
+    store.pub();
+    try { await Promise.all(pendingIds.map(id => WW.approveOrder(id))); }
+    catch(e) { alert(e.message||'일괄 승인 실패'); store.orders = prev; store.pub(); }
+    setSelected(new Set());
   }
   const filtered = filter==='전체' ? store.orders : store.orders.filter(o => o.status===filter);
   const pendingSelected = [...selected].filter(id => store.orders.find(o=>o.id===id)?.status==='pending').length;
@@ -1021,25 +1055,75 @@ function AdminEmployeeMgmt() {
   const [expanded, setExpanded] = React.useState(null);
   const [inputs, setInputs] = React.useState({});
   const [flash, setFlash] = React.useState(null);
+  const [selected, setSelected] = React.useState(new Set());
+  const [bulkAmount, setBulkAmount] = React.useState('');
+  const [bulkNote, setBulkNote] = React.useState('');
+  const [bulkLoading, setBulkLoading] = React.useState(false);
   const PF = "var(--font-sans)";
   const SC = { pending:{label:'승인대기',bg:'#FFFBEB',color:'#92400E',border:'#FDE68A'}, approved:{label:'승인됨',bg:'#EFF6FF',color:'#1E40AF',border:'#BFDBFE'}, shipped:{label:'배송중',bg:'#F0FDF4',color:'#166534',border:'#BBF7D0'}, delivered:{label:'수령완료',bg:'#F9FAFB',color:'#6B7280',border:'#E5E7EB'}, rejected:{label:'반려됨',bg:'#FEF2F2',color:'#991B1B',border:'#FECACA'} };
 
+  const allChecked = store.employees.length > 0 && store.employees.every(e => selected.has(e.id));
+  function toggleSel(id) { setSelected(prev => { const n=new Set(prev); n.has(id)?n.delete(id):n.add(id); return n; }); }
   function setInput(id, k, v) { setInputs(p => ({...p, [id]:{...p[id],[k]:v}})); }
-  function adjust(emp, type) {
+
+  async function adjust(emp, type) {
     const amt = parseInt((inputs[emp.id]||{}).amount);
     if (!amt) return;
     const delta = type==='add' ? amt : -amt;
+    const prev = store.employees;
     store.employees = store.employees.map(e => e.id===emp.id ? {...e, pts: Math.max(0, e.pts+delta), total_used: type==='sub' ? e.total_used+amt : e.total_used} : e);
     store.pub();
+    try { await WW.grantPoints(emp.id, delta, (inputs[emp.id]||{}).note || null); }
+    catch(e) { alert(e.message||'포인트 조정 실패'); store.employees = prev; store.pub(); return; }
     setInputs(p => ({...p, [emp.id]:{amount:'',note:''}}));
     setFlash(emp.id); setTimeout(() => setFlash(null), 1600);
   }
 
+  async function bulkGrant() {
+    const amt = parseInt(bulkAmount);
+    if (!amt || amt <= 0) return;
+    setBulkLoading(true);
+    const ids = [...selected];
+    const prev = store.employees;
+    store.employees = store.employees.map(e => ids.includes(e.id) ? {...e, pts: e.pts+amt} : e);
+    store.pub();
+    try {
+      await Promise.all(ids.map(id => WW.grantPoints(id, amt, bulkNote || null)));
+      await WW.bootstrap();
+      setBulkAmount(''); setBulkNote(''); setSelected(new Set());
+    } catch(e) {
+      alert(e.message||'일괄 지급 실패'); store.employees = prev; store.pub();
+    } finally { setBulkLoading(false); }
+  }
+
+  async function deleteEmployee(emp) {
+    if (!window.confirm(`'${emp.name}' 직원을 삭제하시겠습니까?\n삭제된 계정은 복구할 수 없습니다.`)) return;
+    try {
+      if (WW?.deleteUser) await WW.deleteUser(emp.id);
+      await WW.bootstrap();
+    } catch(e) {
+      store.employees = store.employees.filter(e => e.id !== emp.id);
+      store.pub();
+    }
+  }
+
   return (
     <div className="content">
+      {selected.size > 0 && (
+        <div style={{ padding:'14px 18px', borderRadius:14, background:'linear-gradient(135deg,rgba(47,128,237,0.08),rgba(47,128,237,0.04))', border:'1px solid rgba(47,128,237,0.2)', display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+          <span style={{ fontSize:13, fontWeight:700, color:'var(--accent)', fontFamily:PF, whiteSpace:'nowrap' }}>{selected.size}명 선택됨</span>
+          <input className="form-input" type="number" min="1" placeholder="지급 포인트" value={bulkAmount} onChange={e => setBulkAmount(e.target.value)} style={{ width:130, height:38 }}/>
+          <input className="form-input" placeholder="사유 (선택)" value={bulkNote} onChange={e => setBulkNote(e.target.value)} style={{ flex:1, minWidth:100, maxWidth:220, height:38 }}/>
+          <button className="btn btn-primary" onClick={bulkGrant} disabled={!bulkAmount||bulkLoading} style={{ height:38, whiteSpace:'nowrap' }}>
+            <Icon name="points"/> {bulkLoading?'처리 중...':`${selected.size}명 일괄 지급`}
+          </button>
+          <button className="btn btn-secondary btn-sm" onClick={() => setSelected(new Set())}>선택 해제</button>
+        </div>
+      )}
       <div className="glass-card" style={{ padding:0, overflow:'hidden' }}>
-        <div style={{ padding:'16px 20px', borderBottom:'1px solid var(--border-hairline-2)', fontFamily:'var(--font-display)', fontWeight:600, fontSize:16, color:'var(--fg-1)' }}>
-          직원 목록 ({store.employees.length}명)
+        <div style={{ padding:'16px 20px', borderBottom:'1px solid var(--border-hairline-2)', display:'flex', alignItems:'center', gap:14 }}>
+          <input type="checkbox" checked={allChecked} onChange={() => setSelected(allChecked ? new Set() : new Set(store.employees.map(e=>e.id)))} style={{ cursor:'pointer', width:16, height:16 }}/>
+          <span style={{ fontFamily:'var(--font-display)', fontWeight:600, fontSize:16, color:'var(--fg-1)' }}>직원 목록 ({store.employees.length}명)</span>
         </div>
         {store.employees.map(emp => {
           const isExp = expanded===emp.id;
@@ -1047,19 +1131,27 @@ function AdminEmployeeMgmt() {
           const inp = inputs[emp.id] || { amount:'', note:'' };
           return (
             <div key={emp.id} style={{ borderBottom:'1px solid var(--border-hairline-2)' }}>
-              <div onClick={() => setExpanded(isExp ? null : emp.id)} style={{ display:'grid', gridTemplateColumns:'1fr 1fr 120px 120px 80px', gap:16, padding:'14px 20px', alignItems:'center', cursor:'pointer' }}
+              <div style={{ display:'grid', gridTemplateColumns:'44px 1fr 1fr 120px 120px 80px 44px', gap:12, padding:'14px 20px', alignItems:'center' }}
                 onMouseEnter={e => e.currentTarget.style.background='rgba(47,128,237,0.03)'}
                 onMouseLeave={e => e.currentTarget.style.background=''}>
-                <div>
+                <div onClick={e => e.stopPropagation()} style={{ display:'flex', justifyContent:'center' }}>
+                  <input type="checkbox" checked={selected.has(emp.id)} onChange={() => toggleSel(emp.id)} style={{ cursor:'pointer', width:16, height:16 }}/>
+                </div>
+                <div onClick={() => setExpanded(isExp ? null : emp.id)} style={{ cursor:'pointer' }}>
                   <div style={{ fontWeight:600, fontSize:14, color:'var(--fg-1)' }}>{emp.name}</div>
                   <div style={{ fontSize:12, color:'var(--fg-3)', marginTop:2 }}>{emp.position} · {emp.dept}</div>
                 </div>
-                <div style={{ fontSize:12, color:'var(--fg-3)', fontFamily:PF }}>가입 {emp.joinDate}</div>
-                <div style={{ fontFamily:'var(--font-display)', fontWeight:700, color:'var(--accent)', fontSize:15 }}>{fmtPts(emp.pts)}P</div>
-                <div style={{ fontSize:13, color:'var(--fg-3)' }}>사용 {fmtPts(emp.total_used)}P</div>
-                <div style={{ display:'flex', justifyContent:'flex-end', alignItems:'center', gap:8 }}>
+                <div style={{ fontSize:12, color:'var(--fg-3)', fontFamily:PF, cursor:'pointer' }} onClick={() => setExpanded(isExp ? null : emp.id)}>가입 {emp.joinDate}</div>
+                <div style={{ fontFamily:'var(--font-display)', fontWeight:700, color:'var(--accent)', fontSize:15, cursor:'pointer' }} onClick={() => setExpanded(isExp ? null : emp.id)}>{fmtPts(emp.pts)}P</div>
+                <div style={{ fontSize:13, color:'var(--fg-3)', cursor:'pointer' }} onClick={() => setExpanded(isExp ? null : emp.id)}>사용 {fmtPts(emp.total_used)}P</div>
+                <div style={{ display:'flex', justifyContent:'flex-end', alignItems:'center', gap:8, cursor:'pointer' }} onClick={() => setExpanded(isExp ? null : emp.id)}>
                   <span style={{ fontSize:12, color:'var(--fg-3)', fontFamily:PF }}>{orders.length}건</span>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--fg-3)" strokeWidth="2" strokeLinecap="round" style={{ transform: isExp?'rotate(180deg)':'rotate(0)', transition:'transform 200ms' }}><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+                <div onClick={e => e.stopPropagation()} style={{ display:'flex', justifyContent:'center' }}>
+                  <button onClick={() => deleteEmployee(emp)} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--err)', padding:'4px 6px', borderRadius:6, display:'flex', alignItems:'center' }} title="직원 삭제">
+                    <Icon name="trash" size={14}/>
+                  </button>
                 </div>
               </div>
               {isExp && (
