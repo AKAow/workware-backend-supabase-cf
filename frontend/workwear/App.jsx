@@ -93,15 +93,66 @@ function App() {
 
   if (!role) {
     return (
-      <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: 'var(--bg-sky-gradient)' }}>
-        <div className="glass-card" style={{ width: 400 }}>
-          <h3 style={{ marginTop: 0 }}>로그인</h3>
-          <p style={{ fontSize: 12, color: 'var(--fg-3)' }}>project ref: {WW_CONFIG.PROJECT_REF}</p>
-          <input className="form-input" placeholder="이메일" value={email} onChange={e => setEmail(e.target.value)} style={{ marginBottom: 8 }} />
-          <input className="form-input" type="password" placeholder="비밀번호" value={password} onChange={e => setPassword(e.target.value)} style={{ marginBottom: 8 }} />
-          {error && <div style={{ color: 'var(--err)', fontSize: 12, marginBottom: 8 }}>{error}</div>}
-          <div style={{ display: 'grid', gap: 8 }}>
-            <button className="btn btn-primary" onClick={doLogin}>로그인</button>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', minHeight:'100vh', fontFamily:'var(--font-display)' }}>
+        {/* 좌측 — 영상 패널 */}
+        <div style={{ position:'relative', overflow:'hidden', background:'#0a0f1a' }}>
+          <video
+            autoPlay muted loop playsInline
+            style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', opacity:0.55 }}
+          >
+            <source src="https://videos.pexels.com/video-files/3121461/3121461-uhd_2560_1440_25fps.mp4" type="video/mp4"/>
+          </video>
+          <div style={{ position:'absolute', inset:0, background:'linear-gradient(135deg, rgba(10,15,26,0.6) 0%, rgba(10,15,26,0.3) 100%)' }}/>
+          <div style={{ position:'relative', height:'100%', display:'flex', flexDirection:'column', justifyContent:'space-between', padding:'48px 52px' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+              <div style={{ width:36, height:36, borderRadius:10, background:'rgba(255,255,255,0.15)', backdropFilter:'blur(8px)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18 }}>🦺</div>
+              <span style={{ color:'#fff', fontWeight:800, fontSize:18, letterSpacing:'-0.02em' }}>WindTree</span>
+            </div>
+            <div>
+              <div style={{ fontSize:'clamp(28px,3.5vw,44px)', fontWeight:900, color:'#fff', lineHeight:1.15, letterSpacing:'-0.03em', marginBottom:16 }}>
+                현장 작업복<br/>스마트 주문 관리
+              </div>
+              <p style={{ fontSize:15, color:'rgba(255,255,255,0.6)', lineHeight:1.6, margin:0, fontWeight:400 }}>
+                포인트 기반 주문부터 재고 관리까지<br/>하나의 플랫폼으로 간편하게
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* 우측 — 로그인 패널 */}
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'center', background:'#f8fafc', padding:'48px 40px' }}>
+          <div style={{ width:'100%', maxWidth:400 }}>
+            <div style={{ marginBottom:36 }}>
+              <h1 style={{ fontSize:28, fontWeight:900, color:'#0a0f1a', letterSpacing:'-0.03em', margin:'0 0 8px' }}>로그인</h1>
+              <p style={{ fontSize:14, color:'#64748b', margin:0 }}>계정 정보를 입력해주세요</p>
+            </div>
+            <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+              <div>
+                <label style={{ display:'block', fontSize:13, fontWeight:600, color:'#374151', marginBottom:6 }}>이메일</label>
+                <input className="form-input" type="email" placeholder="name@windtreeeng.com" value={email}
+                  onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key==='Enter' && doLogin()}
+                  style={{ background:'#fff', border:'1.5px solid #e2e8f0', borderRadius:12, padding:'12px 16px', fontSize:14, width:'100%', boxSizing:'border-box' }}/>
+              </div>
+              <div>
+                <label style={{ display:'block', fontSize:13, fontWeight:600, color:'#374151', marginBottom:6 }}>비밀번호</label>
+                <input className="form-input" type="password" placeholder="••••••••" value={password}
+                  onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key==='Enter' && doLogin()}
+                  style={{ background:'#fff', border:'1.5px solid #e2e8f0', borderRadius:12, padding:'12px 16px', fontSize:14, width:'100%', boxSizing:'border-box' }}/>
+              </div>
+              {error && (
+                <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 14px', borderRadius:10, background:'rgba(226,55,68,0.07)', border:'1px solid rgba(226,55,68,0.2)', fontSize:13, color:'var(--err)' }}>
+                  ⚠ {error}
+                </div>
+              )}
+              <button onClick={doLogin}
+                style={{ marginTop:4, width:'100%', height:50, borderRadius:12, border:'none', background:'#0a0f1a', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer', letterSpacing:'-0.01em', transition:'opacity 150ms' }}
+                onMouseOver={e => e.currentTarget.style.opacity='0.85'} onMouseOut={e => e.currentTarget.style.opacity='1'}>
+                로그인
+              </button>
+            </div>
+            <p style={{ marginTop:32, fontSize:12, color:'#94a3b8', textAlign:'center' }}>
+              WindTree 작업복 관리 시스템 · 내부 전용
+            </p>
           </div>
         </div>
       </div>
