@@ -25,6 +25,8 @@ function App() {
   const [email, setEmail] = useApp('');
   const [password, setPassword] = useApp('');
   const [error, setError] = useApp('');
+  const [resetMode, setResetMode] = useApp(false);
+  const [resetSent, setResetSent] = useApp(false);
 
   async function resolveAccess() {
     const user = await WW.client.auth.getUser().then(({ data }) => data?.user).catch(() => null);
@@ -49,6 +51,18 @@ function App() {
 
   const totalQty = cart.reduce((s, i) => s + (i.qty || 1), 0);
   const page = PAGE_TITLES[screen] || { title: screen, sub: '' };
+
+  async function doReset() {
+    try {
+      setError('');
+      await WW.client.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin,
+      });
+      setResetSent(true);
+    } catch (e) {
+      setError(e.message || '전송 실패');
+    }
+  }
 
   async function doLogin() {
     try {
@@ -127,33 +141,74 @@ function App() {
         <div style={{ display:'flex', alignItems:'center', justifyContent:'center', background:'#f8fafc', padding:'48px 40px' }}>
           <div style={{ width:'100%', maxWidth:400 }}>
             <div style={{ marginBottom:36 }}>
-              <h1 style={{ fontSize:28, fontWeight:900, color:'#0a0f1a', letterSpacing:'-0.03em', margin:'0 0 8px' }}>로그인</h1>
-              <p style={{ fontSize:14, color:'#64748b', margin:0 }}>계정 정보를 입력해주세요</p>
+              <h1 style={{ fontSize:28, fontWeight:900, color:'#0a0f1a', letterSpacing:'-0.03em', margin:'0 0 8px' }}>
+                {resetMode ? '비밀번호 재설정' : '로그인'}
+              </h1>
+              <p style={{ fontSize:14, color:'#64748b', margin:0 }}>
+                {resetMode ? '가입한 이메일 주소를 입력하면 재설정 링크를 보내드립니다' : '계정 정보를 입력해주세요'}
+              </p>
             </div>
-            <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-              <div>
-                <label style={{ display:'block', fontSize:13, fontWeight:600, color:'#374151', marginBottom:6 }}>이메일</label>
-                <input className="form-input" type="email" placeholder="name@windtreeeng.com" value={email}
-                  onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key==='Enter' && doLogin()}
-                  style={{ background:'#fff', border:'1.5px solid #e2e8f0', borderRadius:12, padding:'12px 16px', fontSize:14, width:'100%', boxSizing:'border-box' }}/>
-              </div>
-              <div>
-                <label style={{ display:'block', fontSize:13, fontWeight:600, color:'#374151', marginBottom:6 }}>비밀번호</label>
-                <input className="form-input" type="password" placeholder="••••••••" value={password}
-                  onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key==='Enter' && doLogin()}
-                  style={{ background:'#fff', border:'1.5px solid #e2e8f0', borderRadius:12, padding:'12px 16px', fontSize:14, width:'100%', boxSizing:'border-box' }}/>
-              </div>
-              {error && (
-                <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 14px', borderRadius:10, background:'rgba(226,55,68,0.07)', border:'1px solid rgba(226,55,68,0.2)', fontSize:13, color:'var(--err)' }}>
-                  ⚠ {error}
+
+            {resetMode ? (
+              resetSent ? (
+                <div style={{ textAlign:'center', padding:'32px 0' }}>
+                  <div style={{ fontSize:40, marginBottom:16 }}>📬</div>
+                  <div style={{ fontSize:16, fontWeight:700, color:'#0a0f1a', marginBottom:8 }}>이메일을 확인해주세요</div>
+                  <div style={{ fontSize:14, color:'#64748b', marginBottom:24 }}>{email} 으로 재설정 링크를 발송했습니다</div>
+                  <button onClick={() => { setResetMode(false); setResetSent(false); setError(''); }}
+                    style={{ fontSize:14, color:'#2f80ed', background:'none', border:'none', cursor:'pointer', fontWeight:600 }}>
+                    로그인으로 돌아가기
+                  </button>
                 </div>
-              )}
-              <button onClick={doLogin}
-                style={{ marginTop:4, width:'100%', height:50, borderRadius:12, border:'none', background:'#0a0f1a', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer', letterSpacing:'-0.01em', transition:'opacity 150ms' }}
-                onMouseOver={e => e.currentTarget.style.opacity='0.85'} onMouseOut={e => e.currentTarget.style.opacity='1'}>
-                로그인
-              </button>
-            </div>
+              ) : (
+                <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+                  <div>
+                    <label style={{ display:'block', fontSize:13, fontWeight:600, color:'#374151', marginBottom:6 }}>이메일</label>
+                    <input className="form-input" type="email" placeholder="name@windtreeeng.com" value={email}
+                      onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key==='Enter' && doReset()}
+                      style={{ background:'#fff', border:'1.5px solid #e2e8f0', borderRadius:12, padding:'12px 16px', fontSize:14, width:'100%', boxSizing:'border-box' }}/>
+                  </div>
+                  {error && <div style={{ padding:'10px 14px', borderRadius:10, background:'rgba(226,55,68,0.07)', border:'1px solid rgba(226,55,68,0.2)', fontSize:13, color:'var(--err)' }}>⚠ {error}</div>}
+                  <button onClick={doReset}
+                    style={{ marginTop:4, width:'100%', height:50, borderRadius:12, border:'none', background:'#0a0f1a', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer', transition:'opacity 150ms' }}
+                    onMouseOver={e => e.currentTarget.style.opacity='0.85'} onMouseOut={e => e.currentTarget.style.opacity='1'}>
+                    재설정 링크 보내기
+                  </button>
+                  <button onClick={() => { setResetMode(false); setError(''); }}
+                    style={{ fontSize:14, color:'#64748b', background:'none', border:'none', cursor:'pointer', fontWeight:500 }}>
+                    ← 로그인으로 돌아가기
+                  </button>
+                </div>
+              )
+            ) : (
+              <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+                <div>
+                  <label style={{ display:'block', fontSize:13, fontWeight:600, color:'#374151', marginBottom:6 }}>이메일</label>
+                  <input className="form-input" type="email" placeholder="name@windtreeeng.com" value={email}
+                    onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key==='Enter' && doLogin()}
+                    style={{ background:'#fff', border:'1.5px solid #e2e8f0', borderRadius:12, padding:'12px 16px', fontSize:14, width:'100%', boxSizing:'border-box' }}/>
+                </div>
+                <div>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
+                    <label style={{ fontSize:13, fontWeight:600, color:'#374151' }}>비밀번호</label>
+                    <button onClick={() => { setResetMode(true); setError(''); }}
+                      style={{ fontSize:12, color:'#2f80ed', background:'none', border:'none', cursor:'pointer', fontWeight:500, padding:0 }}>
+                      비밀번호 찾기
+                    </button>
+                  </div>
+                  <input className="form-input" type="password" placeholder="••••••••" value={password}
+                    onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key==='Enter' && doLogin()}
+                    style={{ background:'#fff', border:'1.5px solid #e2e8f0', borderRadius:12, padding:'12px 16px', fontSize:14, width:'100%', boxSizing:'border-box' }}/>
+                </div>
+                {error && <div style={{ padding:'10px 14px', borderRadius:10, background:'rgba(226,55,68,0.07)', border:'1px solid rgba(226,55,68,0.2)', fontSize:13, color:'var(--err)' }}>⚠ {error}</div>}
+                <button onClick={doLogin}
+                  style={{ marginTop:4, width:'100%', height:50, borderRadius:12, border:'none', background:'#0a0f1a', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer', letterSpacing:'-0.01em', transition:'opacity 150ms' }}
+                  onMouseOver={e => e.currentTarget.style.opacity='0.85'} onMouseOut={e => e.currentTarget.style.opacity='1'}>
+                  로그인
+                </button>
+              </div>
+            )}
+
             <p style={{ marginTop:32, fontSize:12, color:'#94a3b8', textAlign:'center' }}>
               WindTree 작업복 관리 시스템 · 내부 전용
             </p>
