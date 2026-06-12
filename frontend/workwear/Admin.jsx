@@ -951,7 +951,19 @@ function AdminOrderMgmt() {
   const PF = "var(--font-sans)";
   const LABELS = { 전체:'전체', pending:'승인대기', approved:'승인됨', shipped:'배송중', delivered:'수령완료', rejected:'반려됨' };
 
-  function updateStatus(id, status) { store.orders = store.orders.map(o => o.id===id ? {...o, status} : o); store.pub(); }
+  async function updateStatus(id, status) {
+    const prev = store.orders;
+    store.orders = store.orders.map(o => o.id===id ? {...o, status} : o);
+    store.pub();
+    try {
+      if (status === 'approved') await WW.approveOrder(id);
+      else if (status === 'rejected') await WW.rejectOrder(id, '관리자 반려');
+    } catch (e) {
+      alert(e.message || '상태 변경 실패');
+      store.orders = prev;
+      store.pub();
+    }
+  }
   function toggleSel(id) { setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; }); }
   function bulkApprove() {
     store.orders = store.orders.map(o => selected.has(o.id) && o.status==='pending' ? {...o, status:'approved'} : o);

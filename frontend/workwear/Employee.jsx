@@ -29,7 +29,7 @@ const HOME_STATUS = {
   rejected:  { label:'반려됨',   bg:'#FEF2F2', color:'#991B1B', border:'#FECACA' },
 };
 
-function EmployeeHome({ setScreen, setSelectedProduct, setCart }) {
+function EmployeeHome({ setScreen, setSelectedProduct, setCart, openCart }) {
   const [slide, setSlide] = useEmp(0);
   const [hovCat, setHovCat] = useEmp(null);
   const [hovProd, setHovProd] = useEmp(null);
@@ -40,7 +40,7 @@ function EmployeeHome({ setScreen, setSelectedProduct, setCart }) {
   React.useEffect(() => {
     const t = setInterval(() => setSlide(s => (s + 1) % (activeBanners.length || 1)), 4800);
     return () => clearInterval(t);
-  }, []);
+  }, [activeBanners.length]);
 
   function addToCart(product, e) {
     e && e.stopPropagation();
@@ -64,6 +64,7 @@ function EmployeeHome({ setScreen, setSelectedProduct, setCart }) {
         qty: 1,
       }];
     });
+    openCart?.();
   }
 
   const featured = store.products.filter(p => p.active).slice(0, 8);
@@ -752,8 +753,10 @@ function CartDrawer({ isOpen, onClose, cart, setCart }) {
   function submitOrder() {
     (async () => {
       try {
+        const excluded = cart.filter(i => !i.variant_id);
+        if (excluded.length) alert(`아래 상품은 옵션 정보가 없어 주문에서 제외됩니다:\n${excluded.map(i => i.name).join('\n')}`);
         const items = cart.filter(i => i.variant_id).map(i => ({ variant_id: i.variant_id, quantity: i.qty || 1 }));
-        if (!items.length) throw new Error('상품 variant_id 매핑 후 주문 가능합니다.');
+        if (!items.length) throw new Error('주문 가능한 상품이 없습니다. 상품을 다시 선택해주세요.');
         await WW.createOrder({ items });
         await WW.bootstrap();
         setSubmitted(true);
