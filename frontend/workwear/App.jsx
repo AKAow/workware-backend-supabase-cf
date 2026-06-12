@@ -27,6 +27,7 @@ function App() {
   const [error, setError] = useApp('');
   const [resetMode, setResetMode] = useApp(false);
   const [resetSent, setResetSent] = useApp(false);
+  const [resetLoading, setResetLoading] = useApp(false);
 
   async function resolveAccess() {
     const user = await WW.client.auth.getUser().then(({ data }) => data?.user).catch(() => null);
@@ -53,14 +54,22 @@ function App() {
   const page = PAGE_TITLES[screen] || { title: screen, sub: '' };
 
   async function doReset() {
+    if (resetLoading) return;
     try {
       setError('');
-      await WW.client.auth.resetPasswordForEmail(email, {
+      setResetLoading(true);
+      const { error: err } = await WW.client.auth.resetPasswordForEmail(email, {
         redirectTo: 'https://workwear.windtreeeng.com',
       });
+      if (err) {
+        if (err.status === 429) throw new Error('이메일 전송 횟수 초과. 잠시 후 다시 시도해주세요.');
+        throw err;
+      }
       setResetSent(true);
     } catch (e) {
       setError(e.message || '전송 실패');
+    } finally {
+      setResetLoading(false);
     }
   }
 
@@ -169,10 +178,10 @@ function App() {
                       style={{ background:'#fff', border:'1.5px solid #e2e8f0', borderRadius:12, padding:'12px 16px', fontSize:14, width:'100%', boxSizing:'border-box' }}/>
                   </div>
                   {error && <div style={{ padding:'10px 14px', borderRadius:10, background:'rgba(226,55,68,0.07)', border:'1px solid rgba(226,55,68,0.2)', fontSize:13, color:'var(--err)' }}>⚠ {error}</div>}
-                  <button onClick={doReset}
-                    style={{ marginTop:4, width:'100%', height:50, borderRadius:12, border:'none', background:'#0a0f1a', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer', transition:'opacity 150ms' }}
-                    onMouseOver={e => e.currentTarget.style.opacity='0.85'} onMouseOut={e => e.currentTarget.style.opacity='1'}>
-                    재설정 링크 보내기
+                  <button onClick={doReset} disabled={resetLoading}
+                    style={{ marginTop:4, width:'100%', height:50, borderRadius:12, border:'none', background: resetLoading ? '#64748b' : '#0a0f1a', color:'#fff', fontSize:15, fontWeight:700, cursor: resetLoading ? 'not-allowed' : 'pointer', transition:'opacity 150ms' }}
+                    onMouseOver={e => { if (!resetLoading) e.currentTarget.style.opacity='0.85'; }} onMouseOut={e => e.currentTarget.style.opacity='1'}>
+                    {resetLoading ? '전송 중...' : '재설정 링크 보내기'}
                   </button>
                   <button onClick={() => { setResetMode(false); setError(''); }}
                     style={{ fontSize:14, color:'#64748b', background:'none', border:'none', cursor:'pointer', fontWeight:500 }}>
