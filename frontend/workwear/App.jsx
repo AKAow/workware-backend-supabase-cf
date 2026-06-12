@@ -94,15 +94,20 @@ function App() {
   if (!role) {
     return (
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', minHeight:'100vh', fontFamily:'var(--font-display)' }}>
-        {/* 좌측 — 영상 패널 */}
+        {/* 좌측 — 영상 패널 (VIDEO_URL 변수에 mp4 URL 지정 시 영상 재생) */}
         <div style={{ position:'relative', overflow:'hidden', background:'#0a0f1a' }}>
-          <video
-            autoPlay muted loop playsInline
-            style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', opacity:0.55 }}
-          >
-            <source src="https://videos.pexels.com/video-files/3121461/3121461-uhd_2560_1440_25fps.mp4" type="video/mp4"/>
-          </video>
-          <div style={{ position:'absolute', inset:0, background:'linear-gradient(135deg, rgba(10,15,26,0.6) 0%, rgba(10,15,26,0.3) 100%)' }}/>
+          <style>{`
+            @keyframes gradShift {
+              0%   { background-position: 0% 50%; }
+              50%  { background-position: 100% 50%; }
+              100% { background-position: 0% 50%; }
+            }
+          `}</style>
+          {/* 애니메이션 그라디언트 배경 */}
+          <div style={{ position:'absolute', inset:0, background:'linear-gradient(-45deg,#0a0f1a,#0f2044,#0a2a1a,#1a0a2a)', backgroundSize:'400% 400%', animation:'gradShift 12s ease infinite' }}/>
+          {/* 격자 텍스처 오버레이 */}
+          <div style={{ position:'absolute', inset:0, backgroundImage:'linear-gradient(rgba(255,255,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.03) 1px,transparent 1px)', backgroundSize:'40px 40px' }}/>
+          <div style={{ position:'absolute', inset:0, background:'linear-gradient(135deg, rgba(10,15,26,0.4) 0%, transparent 60%)' }}/>
           <div style={{ position:'relative', height:'100%', display:'flex', flexDirection:'column', justifyContent:'space-between', padding:'48px 52px' }}>
             <div style={{ display:'flex', alignItems:'center', gap:12 }}>
               <div style={{ width:36, height:36, borderRadius:10, background:'rgba(255,255,255,0.15)', backdropFilter:'blur(8px)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18 }}>🦺</div>
