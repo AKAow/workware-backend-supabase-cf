@@ -15,4 +15,4 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy frontend/workwear --project-name=workware-backend-supabase-cf
+          command: pages deploy frontend/workwear --project-name=workwear-v5-nike
